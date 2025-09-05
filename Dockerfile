@@ -45,8 +45,8 @@ RUN npm prune --omit=dev
 RUN mkdir -p logs
 
 # Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S ralph -u 1001
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home ralph
 
 # Change ownership of app directory
 RUN chown -R ralph:nodejs /app
