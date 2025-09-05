@@ -10,8 +10,8 @@ import { logger } from '../../config/database';
  */
 
 export const Trends24Source: TrendSource = {
-  name: 'Trends24 (X/Twitter)',
-  url: 'https://trends24.in/',
+  name: 'Trends24 (X/Twitter US)',
+  url: 'https://trends24.in/united-states/',
   scrapeMethod: 'axios',
   rateLimit: {
     requests: 10,
@@ -81,11 +81,11 @@ export const Trends24Source: TrendSource = {
                 popularity: 'Trending',
                 category: 'Social',
                 platform: 'X (Twitter)',
-                region: 'Global',
+                region: 'United States',
                 timestamp: new Date(),
                 metadata: {
-                  source_url: 'https://trends24.in/',
-                  scraped_from: 'Trends24 (Third-party)',
+                  source_url: 'https://trends24.in/united-states/',
+                  scraped_from: 'Trends24 US (Third-party)',
                   selector_used: selector,
                   extraction_strategy: i + 1
                 }
