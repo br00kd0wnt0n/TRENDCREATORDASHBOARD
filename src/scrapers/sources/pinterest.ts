@@ -44,15 +44,12 @@ export const PinterestSource: TrendSource = {
       });
 
       if (trends.length === 0) {
-        trends.push({
-          hashtag: '#HomeDecor',
-          popularity: 'High',
-          category: 'Design',
-          platform: 'Pinterest',
-          region: 'Global',
-          timestamp: new Date(),
-          metadata: { fallback: true }
-        });
+        logger.warn('🚨 Pinterest scraping failed - no trends extracted');
+        logger.warn('📄 This might indicate that Pinterest has changed their page structure');
+        logger.warn('🔧 Selectors may need updating: .trend-item, .trending-card, [data-test-id="trending-item"]');
+        
+        // Return empty array instead of fallback data to see actual scraping failures
+        return [];
       }
 
       logger.info(`Extracted ${trends.length} Pinterest trends`);

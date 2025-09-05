@@ -36,9 +36,10 @@ An intelligent trend tracking system that combines sophisticated web scraping te
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20+
 - PostgreSQL 13+
 - Docker (optional but recommended)
+- Anthropic API key for Claude AI analysis
 
 ### 1. Installation
 
@@ -69,7 +70,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 # Application Settings
 NODE_ENV=development
-DASHBOARD_PORT=3001
+DASHBOARD_PORT=30003
 LOG_LEVEL=info
 ```
 
@@ -99,7 +100,7 @@ npm run dev
 npm run build
 npm start
 
-# Dashboard available at: http://localhost:3001
+# Dashboard available at: http://localhost:30003
 ```
 
 ## 🛠️ Usage Examples
@@ -302,8 +303,8 @@ MAX_CONCURRENT_PAGES=5
 # Build optimized container
 docker build -t ralph-trends .
 
-# Deploy with environment variables
-docker run -d -p 3001:3001 --env-file .env ralph-trends
+# Deploy with environment variables  
+docker run -d -p 30003:30003 --env-file .env ralph-trends
 ```
 
 ### Health Monitoring
@@ -318,7 +319,7 @@ The system provides built-in monitoring:
 
 ```bash
 # Export trends to JSON
-curl "http://localhost:3001/api/trends?limit=1000" > trends.json
+curl "http://localhost:30003/api/trends?limit=1000" > trends.json
 
 # Database backup
 pg_dump trend_tracker > backup.sql
@@ -362,9 +363,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Express.js**: Web application framework
 - **Chart.js**: Dashboard visualization library
 
+## 🚂 Railway Deployment
+
+For Railway cloud deployment, see the comprehensive [Railway Deployment Guide](RAILWAY_DEPLOYMENT.md) which includes:
+
+- PostgreSQL database setup
+- Environment variable configuration  
+- SSL/TLS configuration for production
+- Troubleshooting common deployment issues
+- Performance optimization settings
+
+### Quick Railway Setup
+
+1. **Create Railway Project**: Connect your GitHub repo
+2. **Add PostgreSQL**: Add PostgreSQL service to your project
+3. **Configure Variables**: Set `ANTHROPIC_API_KEY`, `DATABASE_URL`, `NODE_ENV=production`
+4. **Deploy**: Railway auto-deploys on git push
+
 ---
 
 **🔥 Ralph Loves Trends** - *Where AI meets trend intelligence*
 
-[![Twitter](https://img.shields.io/twitter/follow/ralph?style=social)](https://twitter.com/ralph)
-[![GitHub](https://img.shields.io/github/stars/ralph/RalphLovesTrends?style=social)](https://github.com/ralph/RalphLovesTrends)
+[![GitHub](https://img.shields.io/github/stars/br00kd0wnt0n/RalphLovesTrends?style=social)](https://github.com/br00kd0wnt0n/RalphLovesTrends)

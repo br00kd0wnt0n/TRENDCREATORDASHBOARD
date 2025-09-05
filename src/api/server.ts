@@ -182,24 +182,74 @@ app.get('/api/trends/search', async (_req, res) => {
   }
 });
 
+// Global scraping status tracking
+let scrapingStatus = {
+  isRunning: false,
+  currentSource: null,
+  progress: 0,
+  totalSources: 0,
+  completedSources: 0,
+  trends: [],
+  errors: [],
+  startTime: null,
+  lastUpdate: null
+};
+
 app.post('/api/scrape', async (_req, res) => {
   try {
+    if (scrapingStatus.isRunning) {
+      res.json({ 
+        success: false, 
+        message: 'Scraping already in progress',
+        status: scrapingStatus
+      });
+      return;
+    }
+
     logger.info('Manual scraping initiated via API');
+    
+    // Reset status
+    scrapingStatus = {
+      isRunning: true,
+      currentSource: null,
+      progress: 0,
+      totalSources: 3, // TikTok, Pinterest, Twitter
+      completedSources: 0,
+      trends: [],
+      errors: [],
+      startTime: new Date(),
+      lastUpdate: new Date()
+    };
     
     res.json({ 
       success: true, 
-      message: 'Scraping started. Check /api/scrape/status for progress.' 
+      message: 'Scraping started successfully',
+      status: scrapingStatus
     });
 
+    // Run scraping asynchronously
     const result = await scraper.scrapeAllSources();
+    
+    // Update final status
+    scrapingStatus.isRunning = false;
+    scrapingStatus.progress = 100;
+    scrapingStatus.trends = result.trends;
+    scrapingStatus.lastUpdate = new Date();
+    
     logger.info(`Manual scraping completed: ${result.trends.length} trends`);
   } catch (error) {
     logger.error('Manual scraping failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Scraping failed' 
-    });
+    scrapingStatus.isRunning = false;
+    scrapingStatus.errors.push(error.message);
+    scrapingStatus.lastUpdate = new Date();
   }
+});
+
+app.get('/api/scrape/status', (_req, res) => {
+  res.json({
+    success: true,
+    data: scrapingStatus
+  });
 });
 
 app.get('/api/trending/top', async (_req, res) => {
