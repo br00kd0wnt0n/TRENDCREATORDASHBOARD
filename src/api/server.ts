@@ -264,6 +264,51 @@ app.get('/api/scrape/status', (_req, res) => {
   });
 });
 
+// Debug endpoint to see current database entries
+app.get('/api/debug/trends', async (_req, res) => {
+  try {
+    const recentTrends = await Trend.findAll({
+      order: [['scrapedAt', 'DESC']],
+      limit: 10,
+      raw: true
+    });
+    
+    res.json({
+      success: true,
+      data: recentTrends,
+      count: recentTrends.length
+    });
+  } catch (error) {
+    logger.error('Debug trends failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch debug trends' 
+    });
+  }
+});
+
+// Debug endpoint to clear all trends
+app.delete('/api/debug/trends', async (_req, res) => {
+  try {
+    const deletedCount = await Trend.destroy({
+      where: {},
+      truncate: true
+    });
+    
+    logger.info(`🗑️ Cleared ${deletedCount} trends from database`);
+    res.json({
+      success: true,
+      message: `Cleared ${deletedCount} trends from database`
+    });
+  } catch (error) {
+    logger.error('Clear trends failed:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to clear trends' 
+    });
+  }
+});
+
 app.get('/api/trending/top', async (_req, res) => {
   try {
     const { platform, timeframe = '24h', limit = 10 } = _req.query;

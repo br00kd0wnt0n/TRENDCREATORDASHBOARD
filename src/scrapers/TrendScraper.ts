@@ -14,6 +14,7 @@ export class TrendScraper {
   private aiService: AIEnrichmentService;
   private sources: TrendSource[];
   private isRunning = false;
+  public statusCallback?: (status: any) => void;
 
   constructor() {
     this.browserManager = new BrowserManager();
