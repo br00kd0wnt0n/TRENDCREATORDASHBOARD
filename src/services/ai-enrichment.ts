@@ -155,4 +155,27 @@ Format as a professional report with sections and bullet points.`
       return 'Unable to generate trend report at this time';
     }
   }
+
+  /**
+   * Analyze raw content to extract trends (for fallback extraction)
+   */
+  async analyzeContent(prompt: string): Promise<string | null> {
+    try {
+      const response = await this.anthropic.messages.create({
+        model: this.model,
+        max_tokens: 1000,
+        temperature: 0.5,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      });
+
+      const content = response.content[0];
+      return content.type === 'text' ? content.text : null;
+    } catch (error) {
+      logger.error('AI content analysis failed:', error);
+      return null;
+    }
+  }
 }

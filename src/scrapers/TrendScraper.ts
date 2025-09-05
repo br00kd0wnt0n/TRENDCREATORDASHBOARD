@@ -203,13 +203,22 @@ export class TrendScraper {
       
       if (trends.length > 0) {
         logger.info(`📋 Sample extracted data: ${JSON.stringify(trends.slice(0, 2), null, 2)}`);
+        return trends;
       } else {
-        logger.warn(`⚠️  No trends extracted - checking page content...`);
+        logger.warn(`⚠️  No trends extracted - applying fallback extraction...`);
         const bodyText = await page.evaluate(() => document.body.innerText.slice(0, 500));
         logger.debug(`📄 Page content preview: ${bodyText}...`);
+        
+        // Apply fallback extraction for Puppeteer pages
+        const pageHtml = await page.content();
+        const fallbackTrends = await this.applyFallbackExtraction(pageHtml, source);
+        
+        if (fallbackTrends.length > 0) {
+          logger.info(`🔄 Fallback extraction successful: ${fallbackTrends.length} trends found`);
+        }
+        
+        return fallbackTrends;
       }
-
-      return trends;
 
     } catch (error) {
       logger.error(`💥 Puppeteer scraping failed for ${source.name}:`, error);
@@ -249,11 +258,239 @@ export class TrendScraper {
       const delay = this.browserManager.getRandomDelay(2000, 5000);
       await new Promise(resolve => setTimeout(resolve, delay));
 
-      return await source.extractionLogic(response.data);
+      const extractedTrends = await source.extractionLogic(response.data);
+      
+      // Apply fallback extraction if primary method failed
+      if (extractedTrends.length === 0) {
+        logger.warn(`Primary extraction failed for ${source.name}, trying fallback methods...`);
+        const fallbackTrends = await this.applyFallbackExtraction(response.data, source);
+        return fallbackTrends;
+      }
+      
+      return extractedTrends;
     } catch (error) {
       logger.error(`Axios scraping failed for ${source.name}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Advanced fallback extraction strategies for when primary selectors fail
+   */
+  private async applyFallbackExtraction(html: string, source: TrendSource): Promise<TrendData[]> {
+    const cheerio = require('cheerio');
+    const $ = cheerio.load(html);
+    const trends: TrendData[] = [];
+    
+    console.log(`🔄 FALLBACK: Applying emergency extraction for ${source.name}`);
+    
+    // Strategy 1: Generic hashtag pattern matching
+    const hashtagStrategy = this.extractHashtagPatterns($, source);
+    trends.push(...hashtagStrategy);
+    
+    // Strategy 2: Common text pattern extraction
+    if (trends.length < 3) {
+      const textPatternStrategy = this.extractTextPatterns($, source);
+      trends.push(...textPatternStrategy);
+    }
+    
+    // Strategy 3: URL-based extraction
+    if (trends.length < 3) {
+      const urlStrategy = this.extractFromUrls($, source);
+      trends.push(...urlStrategy);
+    }
+    
+    // Strategy 4: AI-powered content analysis (last resort)
+    if (trends.length < 2) {
+      const aiStrategy = await this.extractWithAIAnalysis(html, source);
+      trends.push(...aiStrategy);
+    }
+    
+    console.log(`📊 FALLBACK: Extracted ${trends.length} trends using fallback methods`);
+    logger.info(`Fallback extraction yielded ${trends.length} trends for ${source.name}`);
+    
+    return trends.slice(0, 10); // Limit fallback results
+  }
+  
+  private extractHashtagPatterns($: any, source: TrendSource): TrendData[] {
+    const trends: TrendData[] = [];
+    const hashtagRegex = /#[\w\u4e00-\u9fff]+/g;
+    const pageText = $('body').text();
+    const hashtags = pageText.match(hashtagRegex) || [];
+    
+    const uniqueHashtags = [...new Set(hashtags)]
+      .filter(tag => tag.length > 2 && tag.length < 50)
+      .slice(0, 5);
+    
+    uniqueHashtags.forEach(hashtag => {
+      trends.push({
+        hashtag: hashtag,
+        popularity: 'Trending',
+        category: 'General',
+        platform: source.name,
+        region: 'Global',
+        timestamp: new Date(),
+        metadata: {
+          source_url: source.url,
+          scraped_from: source.name,
+          extraction_method: 'fallback_hashtag_pattern'
+        }
+      });
+    });
+    
+    return trends;
+  }
+  
+  private extractTextPatterns($: any, source: TrendSource): TrendData[] {
+    const trends: TrendData[] = [];
+    
+    // Common trending text patterns
+    const trendingKeywords = [
+      'trending', 'popular', 'viral', 'breaking', 'hot', 'top', 
+      'most', 'best', 'new', 'latest', 'now', 'today'
+    ];
+    
+    const textElements = $('span, div, p, h1, h2, h3, h4, h5, strong, b, a').toArray();
+    const potentialTrends: Set<string> = new Set();
+    
+    textElements.forEach((element: any) => {
+      const text = $(element).text().trim();
+      
+      // Look for text near trending keywords
+      const hasNearbyTrendingKeyword = trendingKeywords.some(keyword => {
+        const parent = $(element).parent();
+        const siblings = $(element).siblings();
+        const nearby = parent.text() + siblings.text();
+        return nearby.toLowerCase().includes(keyword);
+      });
+      
+      if (hasNearbyTrendingKeyword && text.length > 3 && text.length < 60) {
+        // Filter out common UI text
+        if (!text.match(/^(Home|Search|Profile|Settings|About|Contact|Help|Login|Sign|Register|More|Menu|Close|Open|Back|Next|Previous)$/i) &&
+            !text.includes('@') && !text.includes('http') && 
+            text.match(/[a-zA-Z]/) && text.split(' ').length <= 5) {
+          potentialTrends.add(text);
+        }
+      }
+    });
+    
+    Array.from(potentialTrends).slice(0, 5).forEach(trendText => {
+      trends.push({
+        hashtag: trendText.startsWith('#') ? trendText : `#${trendText.replace(/\s+/g, '')}`,
+        popularity: 'Trending',
+        category: 'General',
+        platform: source.name,
+        region: 'Global',
+        timestamp: new Date(),
+        metadata: {
+          source_url: source.url,
+          scraped_from: source.name,
+          extraction_method: 'fallback_text_pattern'
+        }
+      });
+    });
+    
+    return trends;
+  }
+  
+  private extractFromUrls($: any, source: TrendSource): TrendData[] {
+    const trends: TrendData[] = [];
+    const urlPatterns = [
+      /\/search\/([^\/\?&]+)/g,
+      /\/explore\/([^\/\?&]+)/g,
+      /\/trending\/([^\/\?&]+)/g,
+      /\/hashtag\/([^\/\?&]+)/g,
+      /\/topic\/([^\/\?&]+)/g,
+      /q=([^&\?]+)/g
+    ];
+    
+    $('a[href]').each((i: number, element: any) => {
+      const href = $(element).attr('href') || '';
+      
+      urlPatterns.forEach(pattern => {
+        const matches = href.matchAll(pattern);
+        for (const match of matches) {
+          if (match[1]) {
+            const extracted = decodeURIComponent(match[1])
+              .replace(/[+%20_-]/g, ' ')
+              .trim();
+            
+            if (extracted.length > 2 && extracted.length < 50 && trends.length < 5) {
+              trends.push({
+                hashtag: extracted.startsWith('#') ? extracted : `#${extracted.replace(/\s+/g, '')}`,
+                popularity: 'Trending',
+                category: 'General',
+                platform: source.name,
+                region: 'Global',
+                timestamp: new Date(),
+                metadata: {
+                  source_url: source.url,
+                  scraped_from: source.name,
+                  extraction_method: 'fallback_url_pattern'
+                }
+              });
+            }
+          }
+        }
+      });
+    });
+    
+    return trends;
+  }
+  
+  private async extractWithAIAnalysis(html: string, source: TrendSource): Promise<TrendData[]> {
+    try {
+      console.log(`🤖 FALLBACK: Using AI analysis for ${source.name}`);
+      
+      // Truncate HTML to avoid token limits
+      const truncatedHtml = html.slice(0, 50000);
+      
+      const aiPrompt = `
+        Analyze this webpage HTML from ${source.name} and extract trending topics/hashtags.
+        Look for patterns that suggest trending content, popular searches, or viral topics.
+        
+        Return 3-5 potential trends in JSON format:
+        [{"hashtag": "#TrendName", "confidence": 0.8, "context": "brief context"}]
+        
+        HTML snippet:
+        ${truncatedHtml}
+      `;
+      
+      // Use the AI service to analyze content
+      const aiResponse = await this.aiService.analyzeContent(aiPrompt);
+      
+      if (aiResponse && typeof aiResponse === 'string') {
+        try {
+          const parsedTrends = JSON.parse(aiResponse);
+          if (Array.isArray(parsedTrends)) {
+            return parsedTrends
+              .filter((trend: any) => trend.hashtag && trend.confidence > 0.5)
+              .slice(0, 3)
+              .map((trend: any) => ({
+                hashtag: trend.hashtag,
+                popularity: 'AI Detected',
+                category: 'General',
+                platform: source.name,
+                region: 'Global',
+                timestamp: new Date(),
+                metadata: {
+                  source_url: source.url,
+                  scraped_from: source.name,
+                  extraction_method: 'fallback_ai_analysis',
+                  ai_confidence: trend.confidence,
+                  ai_context: trend.context
+                }
+              }));
+          }
+        } catch (parseError) {
+          logger.warn(`Failed to parse AI fallback response: ${parseError}`);
+        }
+      }
+    } catch (error) {
+      logger.warn(`AI fallback extraction failed: ${error}`);
+    }
+    
+    return [];
   }
 
   private async saveEnrichedTrends(trends: TrendData[], analyses: Map<string, any>, source: TrendSource): Promise<any[]> {
