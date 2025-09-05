@@ -47,7 +47,7 @@ export class TrendScraper {
       totalSources: this.sources.length,
       completedSources: 0,
       successfulSources: 0,
-      errors: []
+      errors: [] as string[]
     };
 
     try {
@@ -88,7 +88,8 @@ export class TrendScraper {
           }
 
         } catch (sourceError) {
-          scrapingStats.errors.push(`${source.name}: ${sourceError.message}`);
+          const errorMessage = sourceError instanceof Error ? sourceError.message : 'Unknown error';
+          scrapingStats.errors.push(`${source.name}: ${errorMessage}`);
           logger.error(`${sourceProgress} ❌ Failed to scrape ${source.name}:`, sourceError);
           continue;
         }

@@ -183,7 +183,19 @@ app.get('/api/trends/search', async (_req, res) => {
 });
 
 // Global scraping status tracking
-let scrapingStatus = {
+interface ScrapingStatus {
+  isRunning: boolean;
+  currentSource: string | null;
+  progress: number;
+  totalSources: number;
+  completedSources: number;
+  trends: any[];
+  errors: string[];
+  startTime: Date | null;
+  lastUpdate: Date | null;
+}
+
+let scrapingStatus: ScrapingStatus = {
   isRunning: false,
   currentSource: null,
   progress: 0,
@@ -240,7 +252,7 @@ app.post('/api/scrape', async (_req, res) => {
   } catch (error) {
     logger.error('Manual scraping failed:', error);
     scrapingStatus.isRunning = false;
-    scrapingStatus.errors.push(error.message);
+    scrapingStatus.errors.push(error instanceof Error ? error.message : 'Unknown error');
     scrapingStatus.lastUpdate = new Date();
   }
 });
