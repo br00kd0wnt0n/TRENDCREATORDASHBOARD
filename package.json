@@ -53,7 +53,10 @@
     "tsx": "^4.15.7",
     "typescript": "^5.5.2"
   },
+  "overrides": {
+    "undici": "5.28.4"
+  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

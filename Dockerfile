@@ -1,5 +1,5 @@
-# Use Node.js 18 Alpine for smaller image size
-FROM node:18-alpine
+# Use Node.js 20 Alpine for better compatibility
+FROM node:20-alpine
 
 # Install dependencies for Puppeteer
 RUN apk add --no-cache \
