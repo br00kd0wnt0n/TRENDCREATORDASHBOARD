@@ -11,18 +11,23 @@ export const TikTokSource: TrendSource = {
     window: 3600000
   },
   selectors: {
-    waitFor: '[data-e2e="cc-hashtag-list"], .trend-hashtag-list, .hashtag-card',
-    trends: '[data-e2e="cc-hashtag-item"], .trend-hashtag-item, .hashtag-card',
-    hashtag: '[data-e2e="hashtag-name"], .hashtag-name, .card-title',
-    popularity: '[data-e2e="hashtag-views"], .hashtag-popularity, .view-count',
-    category: '[data-e2e="hashtag-category"], .hashtag-category, .category-tag'
+    waitFor: '.trending-hashtag-card, .hashtag-trend-card, [data-testid="hashtag-card"], .cc-hashtag-item, .trend-card',
+    trends: '.trending-hashtag-card, .hashtag-trend-card, [data-testid="hashtag-card"], .cc-hashtag-item, .trend-card, .hashtag-item',
+    hashtag: '.hashtag-text, .trend-title, .hashtag-name, h3, .card-title, [data-testid="hashtag-text"]',
+    popularity: '.view-count, .popularity-metric, .trend-views, .metric-value, [data-testid="view-count"]',
+    category: '.category-tag, .trend-category, .hashtag-category, [data-testid="category"]'
   },
   extractionLogic: async (page: Page): Promise<TrendData[]> => {
     try {
+      console.log('🎯 TIKTOK: Starting extraction logic');
+      console.log('🔍 TIKTOK: Waiting for selector:', TikTokSource.selectors!.waitFor!);
+      
       await page.waitForSelector(TikTokSource.selectors!.waitFor!, { 
         timeout: 30000,
         visible: true 
       });
+      
+      console.log('✅ TIKTOK: Selector found, proceeding with extraction');
 
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight / 2);
@@ -66,9 +71,18 @@ export const TikTokSource: TrendSource = {
         return items;
       }, TikTokSource.selectors);
 
+      console.log(`📊 TIKTOK: Extracted ${trends.length} TikTok trends`);
       logger.info(`Extracted ${trends.length} TikTok trends`);
+      
+      if (trends.length > 0) {
+        console.log('📋 TIKTOK: Sample trends:', trends.slice(0, 2));
+      } else {
+        console.log('⚠️ TIKTOK: No trends found - checking page content...');
+      }
+      
       return trends;
     } catch (error) {
+      console.log('❌ TIKTOK: Extraction failed:', error);
       logger.error('TikTok extraction failed:', error);
       return [];
     }

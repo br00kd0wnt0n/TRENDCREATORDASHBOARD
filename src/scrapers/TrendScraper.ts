@@ -37,11 +37,16 @@ export class TrendScraper {
   }
 
   async scrapeAllSources(): Promise<{ trends: any[], report: string }> {
+    console.log('🚀 SCRAPER: scrapeAllSources() called');
+    logger.info('🚀 SCRAPER: scrapeAllSources() called via logger');
+    
     if (this.isRunning) {
+      console.log('⚠️ SCRAPER: Already running, returning early');
       logger.warn('Scraping already in progress');
       return { trends: [], report: 'Scraping already in progress' };
     }
 
+    console.log('✅ SCRAPER: Starting scraping process');
     this.isRunning = true;
     const allTrends: any[] = [];
     const scrapingStats = {
