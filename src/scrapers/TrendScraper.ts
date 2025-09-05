@@ -43,45 +43,87 @@ export class TrendScraper {
 
     this.isRunning = true;
     const allTrends: any[] = [];
+    const scrapingStats = {
+      totalSources: this.sources.length,
+      completedSources: 0,
+      successfulSources: 0,
+      errors: []
+    };
 
     try {
-      logger.info('Starting comprehensive trend scraping...');
+      logger.info(`🚀 Starting comprehensive trend scraping across ${this.sources.length} sources...`);
 
-      for (const source of this.sources) {
+      for (let i = 0; i < this.sources.length; i++) {
+        const source = this.sources[i];
+        const sourceProgress = `[${i + 1}/${this.sources.length}]`;
+        
         try {
-          logger.info(`Scraping ${source.name}...`);
+          logger.info(`${sourceProgress} 🎯 Starting scrape: ${source.name}`);
+          logger.info(`${sourceProgress} 🌐 Target URL: ${source.url}`);
+          logger.info(`${sourceProgress} ⚙️  Method: ${source.scrapeMethod}`);
+          
           const trends = await this.scrapeSource(source);
+          scrapingStats.completedSources++;
           
           if (trends.length > 0) {
+            logger.info(`${sourceProgress} ✅ Extracted ${trends.length} raw trends from ${source.name}`);
+            logger.info(`${sourceProgress} 🧠 Starting AI analysis...`);
+            
             const aiAnalyses = await this.aiService.analyzeTrends(trends);
+            logger.info(`${sourceProgress} 🤖 AI analysis completed for ${aiAnalyses.size} trends`);
+            
+            logger.info(`${sourceProgress} 💾 Saving enriched trends to database...`);
             const enrichedTrends = await this.saveEnrichedTrends(trends, aiAnalyses, source);
             allTrends.push(...enrichedTrends);
-            logger.info(`Successfully scraped ${enrichedTrends.length} trends from ${source.name}`);
+            
+            scrapingStats.successfulSources++;
+            logger.info(`${sourceProgress} ✨ Successfully processed ${enrichedTrends.length} trends from ${source.name}`);
+            
+            // Log sample trends for debugging
+            if (enrichedTrends.length > 0) {
+              logger.info(`${sourceProgress} 📊 Sample trends: ${enrichedTrends.slice(0, 3).map(t => t.hashtag).join(', ')}`);
+            }
           } else {
-            logger.warn(`No trends found for ${source.name}`);
+            logger.warn(`${sourceProgress} ⚠️  No trends found for ${source.name} - check selectors or site structure`);
           }
 
         } catch (sourceError) {
-          logger.error(`Failed to scrape ${source.name}:`, sourceError);
+          scrapingStats.errors.push(`${source.name}: ${sourceError.message}`);
+          logger.error(`${sourceProgress} ❌ Failed to scrape ${source.name}:`, sourceError);
           continue;
         }
 
-        const delay = this.browserManager.getRandomDelay(10000, 30000);
-        logger.debug(`Waiting ${delay}ms before next source...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // Inter-source delay with logging
+        if (i < this.sources.length - 1) {
+          const delay = this.browserManager.getRandomDelay(10000, 30000);
+          logger.info(`${sourceProgress} ⏳ Waiting ${Math.round(delay/1000)}s before next source to avoid detection...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
 
+      logger.info(`📈 Generating comprehensive AI trend report...`);
       const report = await this.aiService.generateTrendReport(allTrends);
+      logger.info(`📋 AI trend report generated (${report.length} characters)`);
       
-      logger.info(`Scraping complete. Total trends: ${allTrends.length}`);
+      logger.info(`🎉 Scraping complete! Summary:`);
+      logger.info(`   • Sources processed: ${scrapingStats.completedSources}/${scrapingStats.totalSources}`);
+      logger.info(`   • Successful sources: ${scrapingStats.successfulSources}/${scrapingStats.totalSources}`);
+      logger.info(`   • Total trends collected: ${allTrends.length}`);
+      logger.info(`   • Errors: ${scrapingStats.errors.length}`);
+      
+      if (scrapingStats.errors.length > 0) {
+        logger.warn(`🚨 Errors encountered: ${scrapingStats.errors.join('; ')}`);
+      }
+      
       return { trends: allTrends, report };
 
     } catch (error) {
-      logger.error('Comprehensive scraping failed:', error);
-      return { trends: allTrends, report: 'Scraping encountered errors' };
+      logger.error('💥 Comprehensive scraping failed:', error);
+      return { trends: allTrends, report: 'Scraping encountered critical errors' };
     } finally {
       await this.cleanup();
       this.isRunning = false;
+      logger.info('🧹 Scraping cleanup completed');
     }
   }
 
@@ -94,25 +136,90 @@ export class TrendScraper {
   }
 
   private async scrapePuppeteer(source: TrendSource): Promise<TrendData[]> {
+    logger.info(`🚀 Launching browser for ${source.name}...`);
     await this.browserManager.launch();
     const page = await this.browserManager.createStealthPage();
 
     try {
-      logger.debug(`Navigating to ${source.url}`);
+      logger.info(`🌐 Navigating to: ${source.url}`);
+      const startTime = Date.now();
+      
       await page.goto(source.url, {
         waitUntil: 'networkidle2',
         timeout: 60000
       });
+      
+      const loadTime = Date.now() - startTime;
+      logger.info(`✅ Page loaded in ${loadTime}ms`);
 
-      await this.browserManager.randomWait(page, 3000, 7000);
+      // Check if page loaded properly
+      const pageTitle = await page.title();
+      logger.info(`📄 Page title: "${pageTitle}"`);
+      
+      const pageUrl = page.url();
+      if (pageUrl !== source.url) {
+        logger.warn(`🔄 Page redirected from ${source.url} to ${pageUrl}`);
+      }
+
+      // Human-like behavior simulation
+      logger.info(`🎭 Simulating human behavior...`);
+      const waitTime1 = this.browserManager.getRandomDelay(3000, 7000);
+      logger.debug(`⏳ Random wait: ${waitTime1}ms`);
+      await new Promise(resolve => setTimeout(resolve, waitTime1));
+      
+      logger.info(`📜 Performing human-like scrolling...`);
       await this.browserManager.humanScroll(page);
-      await this.browserManager.randomWait(page, 2000, 5000);
+      
+      const waitTime2 = this.browserManager.getRandomDelay(2000, 5000);
+      logger.debug(`⏳ Post-scroll wait: ${waitTime2}ms`);
+      await new Promise(resolve => setTimeout(resolve, waitTime2));
 
+      // Check for selectors before extraction
+      if (source.selectors?.waitFor) {
+        logger.info(`🔍 Waiting for selector: ${source.selectors.waitFor}`);
+        try {
+          await page.waitForSelector(source.selectors.waitFor, { timeout: 10000 });
+          logger.info(`✅ Target selector found`);
+        } catch (selectorError) {
+          logger.warn(`⚠️  Target selector not found: ${source.selectors.waitFor}`);
+        }
+      }
+
+      // Extract data
+      logger.info(`⚙️  Running extraction logic for ${source.name}...`);
+      const extractionStart = Date.now();
       const trends = await source.extractionLogic(page);
+      const extractionTime = Date.now() - extractionStart;
+      
+      logger.info(`🔢 Extraction completed in ${extractionTime}ms`);
+      logger.info(`📊 Raw trends extracted: ${trends.length}`);
+      
+      if (trends.length > 0) {
+        logger.info(`📋 Sample extracted data: ${JSON.stringify(trends.slice(0, 2), null, 2)}`);
+      } else {
+        logger.warn(`⚠️  No trends extracted - checking page content...`);
+        const bodyText = await page.evaluate(() => document.body.innerText.slice(0, 500));
+        logger.debug(`📄 Page content preview: ${bodyText}...`);
+      }
+
       return trends;
 
+    } catch (error) {
+      logger.error(`💥 Puppeteer scraping failed for ${source.name}:`, error);
+      
+      // Try to get more debug info
+      try {
+        const pageUrl = page.url();
+        const pageTitle = await page.title();
+        logger.error(`🔍 Debug info - URL: ${pageUrl}, Title: ${pageTitle}`);
+      } catch (debugError) {
+        logger.error(`❌ Could not get debug info:`, debugError);
+      }
+      
+      return [];
     } finally {
       await page.close();
+      logger.debug(`🚪 Browser page closed for ${source.name}`);
     }
   }
 
