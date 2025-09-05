@@ -33,7 +33,7 @@ export const TwitterSource: TrendSource = {
           let hashtag = '';
           let popularity = '';
 
-          spans.forEach((span: HTMLElement) => {
+          spans.forEach((span: any) => {
             const text = span.textContent?.trim() || '';
             if (text.startsWith('#') || text.match(/^[A-Z][a-z]+([A-Z][a-z]+)+$/)) {
               hashtag = text;
@@ -52,7 +52,7 @@ export const TwitterSource: TrendSource = {
               region: 'Global',
               timestamp: new Date(),
               metadata: {
-                source_url: window.location.href,
+                source_url: (window as any).location.href,
                 scraped_from: 'Twitter/X Explore'
               }
             });

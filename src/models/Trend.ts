@@ -60,8 +60,7 @@ Trend.init(
     },
     hashtag: {
       type: DataTypes.STRING,
-      allowNull: true,
-      indexes: [{ fields: ['hashtag'] }]
+      allowNull: true
     },
     popularity: {
       type: DataTypes.STRING,
@@ -69,13 +68,11 @@ Trend.init(
     },
     category: {
       type: DataTypes.STRING,
-      allowNull: true,
-      indexes: [{ fields: ['category'] }]
+      allowNull: true
     },
     platform: {
       type: DataTypes.STRING,
-      allowNull: true,
-      indexes: [{ fields: ['platform'] }]
+      allowNull: true
     },
     region: {
       type: DataTypes.STRING,
@@ -86,11 +83,11 @@ Trend.init(
       allowNull: true
     },
     sentiment: {
-      type: DataTypes.ENUM('positive', 'neutral', 'negative'),
+      type: DataTypes.STRING(20),
       allowNull: true
     },
     predictedGrowth: {
-      type: DataTypes.ENUM('increasing', 'stable', 'declining'),
+      type: DataTypes.STRING(20),
       allowNull: true
     },
     businessOpportunities: {

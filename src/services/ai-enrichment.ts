@@ -87,7 +87,7 @@ Return a JSON object with trend identifiers as keys and analysis objects as valu
       
       trends.forEach((trend, index) => {
         const key = `${trend.hashtag || 'unknown'}_${trend.platform || 'unknown'}`;
-        const trendAnalysis = parsed[key] || parsed[trend.hashtag] || parsed[index];
+        const trendAnalysis = parsed[key] || parsed[trend.hashtag || ''] || parsed[index.toString()];
         
         if (trendAnalysis) {
           analyses.set(key, {

@@ -1,4 +1,3 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { TrendSource, TrendData } from '../../types';
 import { logger } from '../../config/database';

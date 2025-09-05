@@ -11,7 +11,7 @@ import { Op } from 'sequelize';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.DASHBOARD_PORT || 3001;
+const PORT = process.env.DASHBOARD_PORT || 30003;
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -30,17 +30,24 @@ app.use(express.static(path.join(__dirname, '../../public')));
 
 const scraper = new TrendScraper();
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoints
+app.get('/health', (_req, res) => {
   res.status(200).json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
-    service: 'Ralph Loves Trends API'
+    service: 'Ralph Loves Trends API',
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
+// Railway health check
+app.get('/healthz', (_req, res) => {
+  res.status(200).send('OK');
+});
+
 // API Routes
-app.get('/api/trends', async (req, res) => {
+app.get('/api/trends', async (_req, res) => {
   try {
     const { 
       platform, 
@@ -49,7 +56,7 @@ app.get('/api/trends', async (req, res) => {
       offset = 0,
       sentiment,
       since 
-    } = req.query;
+    } = _req.query;
 
     const whereClause: any = {};
     
@@ -89,7 +96,7 @@ app.get('/api/trends', async (req, res) => {
   }
 });
 
-app.get('/api/trends/stats', async (req, res) => {
+app.get('/api/trends/stats', async (_req, res) => {
   try {
     const totalTrends = await Trend.count();
     const recentTrends = await Trend.count({
@@ -136,15 +143,16 @@ app.get('/api/trends/stats', async (req, res) => {
   }
 });
 
-app.get('/api/trends/search', async (req, res) => {
+app.get('/api/trends/search', async (_req, res) => {
   try {
-    const { q, limit = 20 } = req.query;
+    const { q, limit = 20 } = _req.query;
     
     if (!q) {
-      return res.status(400).json({ 
+      res.status(400).json({ 
         success: false, 
         error: 'Search query required' 
       });
+      return;
     }
 
     const trends = await Trend.findAll({
@@ -174,7 +182,7 @@ app.get('/api/trends/search', async (req, res) => {
   }
 });
 
-app.post('/api/scrape', async (req, res) => {
+app.post('/api/scrape', async (_req, res) => {
   try {
     logger.info('Manual scraping initiated via API');
     
@@ -194,9 +202,9 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
-app.get('/api/trending/top', async (req, res) => {
+app.get('/api/trending/top', async (_req, res) => {
   try {
-    const { platform, timeframe = '24h', limit = 10 } = req.query;
+    const { platform, timeframe = '24h', limit = 10 } = _req.query;
     
     let since = new Date();
     if (timeframe === '24h') {
@@ -241,12 +249,12 @@ app.get('/api/trending/top', async (req, res) => {
 });
 
 // Serve dashboard HTML
-app.get('/', (req, res) => {
+app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../public/index.html'));
 });
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('API Error:', err);
   res.status(500).json({ 
     success: false, 
@@ -255,7 +263,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (_req, res) => {
   res.status(404).json({ 
     success: false, 
     error: 'Route not found' 

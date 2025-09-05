@@ -23,13 +23,19 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy source code
 COPY . .
 
+# Install all dependencies (including dev for build)
+RUN npm ci
+
 # Build TypeScript
 RUN npm run build
+
+# Remove dev dependencies after build
+RUN npm prune --omit=dev
 
 # Create logs directory
 RUN mkdir -p logs
@@ -43,7 +49,7 @@ RUN chown -R ralph:nodejs /app
 USER ralph
 
 # Expose ports
-EXPOSE 3000 3001
+EXPOSE 30003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

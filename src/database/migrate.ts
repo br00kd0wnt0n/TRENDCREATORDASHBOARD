@@ -1,5 +1,4 @@
 import { sequelize, testConnection, logger } from '../config/database';
-import Trend from '../models/Trend';
 
 async function runMigrations(): Promise<void> {
   try {

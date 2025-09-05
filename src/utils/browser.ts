@@ -128,11 +128,11 @@ export class BrowserManager {
     ];
   }
 
-  async randomWait(page: Page, min = 2000, max = 5000): Promise<void> {
+  async randomWait(_page: Page, min = 2000, max = 5000): Promise<void> {
     if (!this.config.humanization.randomDelays) return;
     
     const delay = this.getRandomDelay(min, max);
-    await page.waitForTimeout(delay);
+    await new Promise(resolve => setTimeout(resolve, delay));
     logger.debug(`Random wait: ${delay}ms`);
   }
 
@@ -140,7 +140,7 @@ export class BrowserManager {
     await page.focus(selector);
     for (const char of text) {
       await page.type(selector, char);
-      await page.waitForTimeout(Math.random() * 200 + 50);
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
     }
   }
 

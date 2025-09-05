@@ -94,7 +94,7 @@ export class TrendScraper {
   }
 
   private async scrapePuppeteer(source: TrendSource): Promise<TrendData[]> {
-    const browser = await this.browserManager.launch();
+    await this.browserManager.launch();
     const page = await this.browserManager.createStealthPage();
 
     try {

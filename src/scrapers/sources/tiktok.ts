@@ -27,9 +27,9 @@ export const TikTokSource: TrendSource = {
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight / 2);
       });
-      await page.waitForTimeout(2000);
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      const trends = await page.evaluate((selectors) => {
+      const trends = await page.evaluate((selectors: any) => {
         const items: TrendData[] = [];
         const trendElements = document.querySelectorAll(selectors.trends!);
         
@@ -53,7 +53,7 @@ export const TikTokSource: TrendSource = {
                 region: 'Global',
                 timestamp: new Date(),
                 metadata: {
-                  source_url: window.location.href,
+                  source_url: (window as any).location.href,
                   scraped_from: 'TikTok Creative Center'
                 }
               });
