@@ -300,6 +300,14 @@
             <button class="btn btn-secondary" onclick="runScraping()">
                 <i class="fas fa-spider"></i> Scrape Now
             </button>
+            
+            <button class="btn btn-secondary" onclick="checkDebugData()">
+                <i class="fas fa-bug"></i> Debug Data
+            </button>
+            
+            <button class="btn btn-secondary" onclick="clearDebugData()" style="background: #dc3545;">
+                <i class="fas fa-trash"></i> Clear DB
+            </button>
         </div>
 
         <div class="stats-grid" id="statsGrid">
@@ -650,6 +658,46 @@
             if (button) {
                 button.innerHTML = '<i class="fas fa-spider"></i> Scrape Now';
                 button.disabled = false;
+            }
+        }
+
+        async function checkDebugData() {
+            try {
+                const response = await fetch('/api/debug/trends');
+                const data = await response.json();
+                
+                console.log('Debug Data:', data);
+                
+                if (data.success && data.data) {
+                    alert(`Found ${data.count} trends in database:\n\n${data.data.slice(0, 3).map(t => `• ${t.hashtag} (${t.platform}) - ${t.scrapedAt}`).join('\n')}\n\n${data.count > 3 ? `...and ${data.count - 3} more` : ''}\n\nCheck console for full details.`);
+                } else {
+                    alert('No trends found in database.');
+                }
+            } catch (error) {
+                console.error('Debug check failed:', error);
+                alert('Failed to check debug data: ' + error.message);
+            }
+        }
+
+        async function clearDebugData() {
+            if (!confirm('Are you sure you want to clear all trends from the database? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/debug/trends', { method: 'DELETE' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(data.message);
+                    loadStats();
+                    loadTrends();
+                } else {
+                    alert('Failed to clear database: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Clear database failed:', error);
+                alert('Failed to clear database: ' + error.message);
             }
         }
 
