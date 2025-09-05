@@ -11,7 +11,7 @@ import { Op } from 'sequelize';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || process.env.DASHBOARD_PORT || 30003;
+const PORT = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '30003');
 
 app.use(helmet({
   contentSecurityPolicy: false,
