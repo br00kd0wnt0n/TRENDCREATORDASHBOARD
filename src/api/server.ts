@@ -11,7 +11,7 @@ import { Op } from 'sequelize';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.DASHBOARD_PORT || 30003;
+const PORT = process.env.PORT || process.env.DASHBOARD_PORT || 30003;
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -274,9 +274,9 @@ async function startServer() {
   try {
     await scraper.initialize();
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       logger.info(`🚀 Ralph Loves Trends API server running on port ${PORT}`);
-      logger.info(`📊 Dashboard available at http://localhost:${PORT}`);
+      logger.info(`📊 Dashboard available at http://0.0.0.0:${PORT}`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
