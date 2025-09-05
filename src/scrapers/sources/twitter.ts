@@ -2,11 +2,24 @@ import { Page } from 'puppeteer';
 import { TrendSource, TrendData } from '../../types';
 import { logger } from '../../config/database';
 
+/**
+ * X (Twitter) Trends Source
+ * 
+ * NOTE: As of 2025, X.com requires authentication to access trending topics.
+ * This scraper will attempt to access trends but may fail without login credentials.
+ * 
+ * Alternative approaches:
+ * 1. Use third-party trend tracking APIs (trends24.in, etc.)
+ * 2. Implement authentication flow with X credentials
+ * 3. Use X API v2 with proper authentication
+ * 4. Rely on fallback extraction methods when primary fails
+ */
+
 export const TwitterSource: TrendSource = {
   name: 'X (Twitter) Trends',
-  url: 'https://x.com/explore/tabs/trending',
+  url: 'https://x.com/explore',
   scrapeMethod: 'puppeteer',
-  requiresAuth: false,
+  requiresAuth: true, // X.com requires authentication for trending topics
   rateLimit: {
     requests: 15,
     window: 900000
@@ -20,15 +33,35 @@ export const TwitterSource: TrendSource = {
   extractionLogic: async (page: Page): Promise<TrendData[]> => {
     try {
       console.log('🎯 X(TWITTER): Starting extraction logic');
-      console.log('🔍 X(TWITTER): Waiting for trend elements...');
+      console.log('🔍 X(TWITTER): Waiting for page to load...');
+      
+      // Check if we're redirected to login page
+      const currentUrl = page.url();
+      if (currentUrl.includes('/login') || currentUrl.includes('/oauth')) {
+        console.log('⚠️ X(TWITTER): Redirected to login - authentication required');
+        logger.warn('X.com requires authentication - cannot access trending topics without login');
+        return [];
+      }
+      
+      // Check for JavaScript disabled message
+      const bodyText = await page.evaluate(() => document.body.textContent || '');
+      if (bodyText.includes('JavaScript is not available')) {
+        console.log('⚠️ X(TWITTER): JavaScript disabled page detected');
+        logger.warn('X.com returned JavaScript disabled page');
+        return [];
+      }
       
       // Try multiple selectors for X.com 2025 structure
-      await page.waitForSelector('[data-testid="trend"], [data-testid="cellInnerDiv"], div[role="button"]', {
-        timeout: 30000,
-        visible: true
-      });
-      
-      console.log('✅ X(TWITTER): Elements found, proceeding with extraction');
+      try {
+        await page.waitForSelector('[data-testid="trend"], [data-testid="cellInnerDiv"], div[role="button"]', {
+          timeout: 15000,
+          visible: true
+        });
+        console.log('✅ X(TWITTER): Elements found, proceeding with extraction');
+      } catch (selectorTimeout) {
+        console.log('⚠️ X(TWITTER): Primary selectors not found, trying fallback approach');
+        // Continue with extraction attempt even if selectors not found
+      }
 
       // Scroll to load more trends
       await page.evaluate(() => {

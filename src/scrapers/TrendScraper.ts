@@ -4,6 +4,7 @@ import { TrendSource, TrendData } from '../types';
 import { TikTokSource } from './sources/tiktok';
 import { PinterestSource } from './sources/pinterest';
 import { TwitterSource } from './sources/twitter';
+import { Trends24Source } from './sources/trends24';
 import Trend from '../models/Trend';
 import { logger } from '../config/database';
 import axios from 'axios';
@@ -22,7 +23,8 @@ export class TrendScraper {
     this.sources = [
       TikTokSource,
       PinterestSource,
-      TwitterSource
+      Trends24Source // Using Trends24 instead of direct X.com due to auth requirements
+      // TwitterSource // Disabled - X.com requires authentication as of 2025
     ];
   }
 
