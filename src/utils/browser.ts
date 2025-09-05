@@ -18,8 +18,12 @@ export class BrowserManager {
   ];
 
   constructor(config?: Partial<ScraperConfig>) {
+    // Force headless mode in production/Railway environment
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT === 'production';
+    const forceHeadless = isProduction || process.env.HEADLESS_BROWSER === 'true';
+    
     this.config = {
-      headless: config?.headless ?? (process.env.HEADLESS_BROWSER === 'true'),
+      headless: config?.headless ?? forceHeadless ?? true, // Default to headless
       userAgents: config?.userAgents || this.userAgents,
       viewport: config?.viewport || { width: 1920, height: 1080 },
       humanization: {
@@ -29,25 +33,52 @@ export class BrowserManager {
         ...config?.humanization
       }
     };
+    
+    console.log(`🖥️  BROWSER: Headless mode: ${this.config.headless} (isProduction: ${isProduction})`);
   }
 
   async launch(): Promise<Browser> {
     if (this.browser) return this.browser;
 
+    console.log('🚀 BROWSER: Launching Chrome with headless mode:', this.config.headless);
+
+    const chromeArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--disable-web-security',
+      '--disable-features=site-per-process',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process', // Important for containers
+      '--disable-gpu',
+      `--window-size=${this.config.viewport?.width},${this.config.viewport?.height}`
+    ];
+
+    // Add extra args for headless server environments
+    if (this.config.headless) {
+      chromeArgs.push(
+        '--disable-extensions',
+        '--hide-scrollbars',
+        '--mute-audio',
+        '--no-default-browser-check',
+        '--disable-plugins'
+      );
+    }
+
+    console.log('🔧 BROWSER: Chrome args:', chromeArgs);
+
     this.browser = await puppeteer.launch({
       headless: this.config.headless,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--disable-web-security',
-        '--disable-features=site-per-process',
-        `--window-size=${this.config.viewport?.width},${this.config.viewport?.height}`
-      ],
-      defaultViewport: this.config.viewport
+      args: chromeArgs,
+      defaultViewport: this.config.viewport,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
     });
 
+    console.log('✅ BROWSER: Chrome launched successfully');
     logger.info('Browser launched with stealth mode enabled');
     return this.browser;
   }
