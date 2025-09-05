@@ -14,15 +14,14 @@ const logger = winston.createLogger({
   ]
 });
 
+const isRailwayConnection = process.env.DATABASE_URL?.includes('.rlwy.net') || process.env.POSTGRES_HOST?.includes('.rlwy.net');
+const requiresSSL = process.env.NODE_ENV === 'production' || isRailwayConnection;
+
 const sequelize = new Sequelize(
-  process.env.POSTGRES_DATABASE || 'trend_tracker',
-  process.env.POSTGRES_USER || 'postgres',
-  process.env.POSTGRES_PASSWORD || '',
+  process.env.DATABASE_URL || `postgresql://${process.env.POSTGRES_USER || 'postgres'}:${process.env.POSTGRES_PASSWORD || ''}@${process.env.POSTGRES_HOST || 'localhost'}:${process.env.POSTGRES_PORT || '5432'}/${process.env.POSTGRES_DATABASE || 'trend_tracker'}`,
   {
-    host: process.env.POSTGRES_HOST || 'localhost',
-    port: parseInt(process.env.POSTGRES_PORT || '5432'),
     dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? 
+    logging: process.env.NODE_ENV === 'development' && !isRailwayConnection ? 
       (msg: string) => logger.debug(msg) : false,
     pool: {
       max: 5,
@@ -30,7 +29,7 @@ const sequelize = new Sequelize(
       acquire: 30000,
       idle: 10000
     },
-    dialectOptions: process.env.NODE_ENV === 'production' ? {
+    dialectOptions: requiresSSL ? {
       ssl: {
         require: true,
         rejectUnauthorized: false
