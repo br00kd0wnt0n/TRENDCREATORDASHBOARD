@@ -157,6 +157,49 @@ Format as a professional report with sections and bullet points.`
   }
 
   /**
+   * Generate dashboard narrative with contextual insights
+   */
+  async generateDashboardNarrative(stats: any): Promise<any> {
+    try {
+      const response = await this.anthropic.messages.create({
+        model: this.model,
+        max_tokens: 1200,
+        temperature: 0.6,
+        messages: [{
+          role: 'user',
+          content: `As a digital culture and trend intelligence expert, analyze these trending hashtags and provide insights about what they reveal:
+
+${JSON.stringify(stats, null, 2)}
+
+Focus primarily on the ACTUAL HASHTAGS and trending content, not on data collection methods. Analyze what these specific trends tell us about:
+
+Generate a JSON response with:
+1. "overview": A 2-3 sentence analysis of what the current trending hashtags reveal about digital culture, consumer behavior, or emerging movements
+2. "totalTrendsInsight": What the variety and volume of these specific hashtags suggests about current cultural/market dynamics (1-2 sentences)
+3. "recentActivityInsight": Analysis of what these particular trends indicate about what's capturing attention right now (1-2 sentences) 
+4. "highConfidenceExplanation": Explanation of what makes certain trends more reliable indicators than others, based on their content and platform presence (2 sentences)
+5. "keyInsights": Array of exactly 5 bullet points about what these SPECIFIC hashtags and trends reveal about opportunities, cultural shifts, consumer interests, or market movements
+6. "question": One thought-provoking question about the trend data that would help users explore deeper insights or implications
+
+Analyze the hashtag content itself - what topics, themes, emotions, or interests do they represent? What do they tell us about what people care about right now?`
+        }]
+      });
+
+      const content = response.content[0];
+      if (content.type === 'text') {
+        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+      }
+      return this.getDefaultNarrative();
+    } catch (error) {
+      logger.error('Dashboard narrative generation failed:', error);
+      return this.getDefaultNarrative();
+    }
+  }
+
+  /**
    * Analyze raw content to extract trends (for fallback extraction)
    */
   async analyzeContent(prompt: string): Promise<string | null> {
@@ -177,5 +220,22 @@ Format as a professional report with sections and bullet points.`
       logger.error('AI content analysis failed:', error);
       return null;
     }
+  }
+
+  private getDefaultNarrative(): any {
+    return {
+      overview: "Trend analysis is currently processing. Fresh insights will be available after the next scraping cycle completes.",
+      totalTrendsInsight: "Total trends represent the cumulative intelligence gathered across all monitoring sources.",
+      recentActivityInsight: "Recent activity indicates the current pulse of digital culture and emerging opportunities.", 
+      highConfidenceExplanation: "High Confidence trends have been validated by AI analysis with strong supporting signals. These represent the most reliable opportunities for immediate action.",
+      keyInsights: [
+        "Multi-platform trend correlation provides stronger market signals",
+        "Real-time monitoring enables rapid response to emerging opportunities",
+        "AI-powered sentiment analysis reveals market reception patterns",
+        "Cross-demographic trend analysis identifies broader appeal potential",
+        "Predictive growth indicators help prioritize investment decisions"
+      ],
+      question: "What emerging patterns do you see across these trending topics that might signal a larger cultural or market shift?"
+    };
   }
 }

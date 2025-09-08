@@ -29,8 +29,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../../public')));
 
 import { progressManager } from '../utils/progress-manager';
+import { AIEnrichmentService } from '../services/ai-enrichment';
 
 const scraper = new TrendScraper();
+const aiService = new AIEnrichmentService();
 
 // Health check endpoints
 app.get('/health', (_req, res) => {
@@ -145,6 +147,120 @@ app.get('/api/trends/stats', async (_req, res) => {
   }
 });
 
+app.get('/api/trends/narrative', async (_req, res) => {
+  try {
+    // Get comprehensive stats for AI analysis
+    const totalTrends = await Trend.count();
+    const recentTrends = await Trend.count({
+      where: {
+        scrapedAt: {
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+
+    const highConfidenceTrends = await Trend.count({
+      where: {
+        confidence: {
+          [Op.gte]: 0.7
+        }
+      }
+    });
+
+    const platformStats = await Trend.findAll({
+      attributes: [
+        'platform',
+        [Trend.sequelize!.fn('COUNT', '*'), 'count']
+      ],
+      group: 'platform',
+      raw: true
+    });
+
+    const sentimentStats = await Trend.findAll({
+      attributes: [
+        'sentiment',
+        [Trend.sequelize!.fn('COUNT', '*'), 'count']
+      ],
+      group: 'sentiment',
+      raw: true
+    });
+
+    // Get recent trends for context (lowered confidence threshold)
+    const topTrends = await Trend.findAll({
+      where: {
+        confidence: {
+          [Op.gte]: 0.1
+        }
+      },
+      order: [
+        ['confidence', 'DESC'],
+        ['scrapedAt', 'DESC']
+      ],
+      limit: 10,
+      raw: true
+    });
+
+    // Get all recent trends to analyze content patterns
+    const allRecentTrends = await Trend.findAll({
+      where: {
+        scrapedAt: {
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      },
+      order: [['scrapedAt', 'DESC']],
+      limit: 30,
+      raw: true
+    });
+
+    const statsForAI = {
+      totalTrends,
+      recentTrends,
+      highConfidenceTrends,
+      platformStats,
+      sentimentStats,
+      topTrends: topTrends.map(t => ({
+        hashtag: t.hashtag,
+        platform: t.platform,
+        sentiment: t.sentiment,
+        confidence: t.confidence,
+        aiInsights: t.aiInsights
+      })),
+      trendingContent: allRecentTrends.map(t => ({
+        hashtag: t.hashtag,
+        platform: t.platform,
+        category: t.category,
+        confidence: t.confidence
+      }))
+    };
+
+    // Generate AI narrative
+    const narrative = await aiService.generateDashboardNarrative(statsForAI);
+    
+    // Include top 10 trends for display
+    const responseData = {
+      ...narrative,
+      topTrends: topTrends.slice(0, 10).map(t => ({
+        hashtag: t.hashtag,
+        platform: t.platform,
+        category: t.category || 'General',
+        confidence: t.confidence,
+        sentiment: t.sentiment || 'neutral'
+      }))
+    };
+    
+    res.json({
+      success: true,
+      data: responseData
+    });
+  } catch (error) {
+    logger.error('Failed to generate dashboard narrative:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to generate narrative' 
+    });
+  }
+});
+
 app.get('/api/trends/search', async (_req, res) => {
   try {
     const { q, limit = 20 } = _req.query;
@@ -229,6 +345,107 @@ app.get('/api/scrape/status', (_req, res) => {
     success: true,
     data: progressManager.getStatus()
   });
+});
+
+// AI question/follow-up endpoint
+app.post('/api/trends/ask', async (req, res) => {
+  try {
+    const { question } = req.body;
+    
+    if (!question) {
+      res.status(400).json({
+        success: false,
+        error: 'Question is required'
+      });
+      return;
+    }
+
+    // Get recent trending content for context
+    const recentTrends = await Trend.findAll({
+      where: {
+        scrapedAt: {
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      },
+      order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+      limit: 20,
+      raw: true
+    });
+
+    const trendContext = recentTrends.map(t => ({
+      hashtag: t.hashtag,
+      platform: t.platform,
+      category: t.category,
+      confidence: t.confidence
+    }));
+
+    // Use AI service to answer the question with trend context
+    const prompt = `Based on these current trending hashtags and topics:
+
+${JSON.stringify(trendContext, null, 2)}
+
+User asks: "${question}"
+
+Provide a thoughtful, data-driven response that references specific hashtags and trends from the data above. Be insightful and actionable.`;
+
+    const answer = await aiService.analyzeContent(prompt);
+
+    res.json({
+      success: true,
+      data: {
+        question: question,
+        answer: answer || 'Unable to analyze the question at this time.',
+        trendContext: trendContext.slice(0, 10) // Include top 10 trends for reference
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to process AI question:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process question'
+    });
+  }
+});
+
+// Scrape history endpoint
+app.get('/api/scrape/history', async (_req, res) => {
+  try {
+    // Get scrape history by grouping trends by scrapedAt date/time
+    const scrapeHistory = await Trend.findAll({
+      attributes: [
+        [Trend.sequelize!.fn('DATE_TRUNC', 'minute', Trend.sequelize!.col('scrapedAt')), 'scrapeTime'],
+        [Trend.sequelize!.fn('COUNT', '*'), 'totalTrends'],
+        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'tiktok' THEN 1 END")), 'tiktokTrends'],
+        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'pinterest' THEN 1 END")), 'pinterestTrends'],
+        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'twitter' THEN 1 END")), 'twitterTrends'],
+        [Trend.sequelize!.fn('AVG', Trend.sequelize!.col('confidence')), 'avgConfidence']
+      ],
+      group: [Trend.sequelize!.fn('DATE_TRUNC', 'minute', Trend.sequelize!.col('scrapedAt'))],
+      order: [[Trend.sequelize!.fn('DATE_TRUNC', 'minute', Trend.sequelize!.col('scrapedAt')), 'DESC']],
+      limit: 20,
+      raw: true
+    });
+
+    const formattedHistory = scrapeHistory.map((entry: any) => ({
+      scrapeTime: entry.scrapeTime,
+      totalTrends: parseInt(entry.totalTrends),
+      tiktokTrends: parseInt(entry.tiktokTrends) || 0,
+      pinterestTrends: parseInt(entry.pinterestTrends) || 0,
+      twitterTrends: parseInt(entry.twitterTrends) || 0,
+      avgConfidence: parseFloat(entry.avgConfidence) || 0
+    }));
+
+    res.json({
+      success: true,
+      data: formattedHistory
+    });
+  } catch (error) {
+    logger.error('Failed to fetch scrape history:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch scrape history' 
+    });
+  }
 });
 
 // Debug endpoint to see current database entries

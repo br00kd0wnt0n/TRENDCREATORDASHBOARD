@@ -342,7 +342,9 @@ export class TrendScraper {
     const pageText = $('body').text();
     const hashtags = pageText.match(hashtagRegex) || [];
     
-    const uniqueHashtags = [...new Set(hashtags)]
+    const hashtagSet = new Set(hashtags);
+    const hashtagArray = Array.from(hashtagSet);
+    const uniqueHashtags = hashtagArray
       .filter((tag: string) => tag.length > 2 && tag.length < 50)
       .slice(0, 5);
     
