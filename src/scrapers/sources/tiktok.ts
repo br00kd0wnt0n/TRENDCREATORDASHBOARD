@@ -50,7 +50,7 @@ export const TikTokSource: TrendSource = {
         }
         
         let processedCount = 0;
-        trendElements.forEach((element: any, index) => {
+        trendElements.forEach((element: any, _index) => {
           if (processedCount >= 50) return; // Limit processing for performance
           
           try {

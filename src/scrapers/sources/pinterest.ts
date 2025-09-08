@@ -137,8 +137,8 @@ export const PinterestSource: TrendSource = {
 
               // Check for duplicates
               const isDuplicate = trends.some(t => 
-                t.hashtag.toLowerCase().includes(hashtag.toLowerCase()) ||
-                hashtag.toLowerCase().includes(t.hashtag.slice(1).toLowerCase())
+                t.hashtag?.toLowerCase().includes(hashtag.toLowerCase()) ||
+                hashtag.toLowerCase().includes(t.hashtag?.slice(1).toLowerCase() || '')
               );
 
               if (!isDuplicate) {
@@ -160,6 +160,7 @@ export const PinterestSource: TrendSource = {
               }
             }
           }
+          return true; // Continue iteration
         });
         
         console.log(`📊 PINTEREST: Found ${trends.length} trends with selector ${i + 1}`);

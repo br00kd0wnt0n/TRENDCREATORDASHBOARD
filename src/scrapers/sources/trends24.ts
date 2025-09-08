@@ -70,8 +70,8 @@ export const Trends24Source: TrendSource = {
             
             // Check for duplicates
             const isDuplicate = trends.some(t => 
-              t.hashtag.toLowerCase() === hashtag.toLowerCase() ||
-              t.hashtag.toLowerCase().includes(hashtag.toLowerCase().slice(1))
+              t.hashtag?.toLowerCase() === hashtag.toLowerCase() ||
+              t.hashtag?.toLowerCase().includes(hashtag.toLowerCase().slice(1))
             );
 
             if (!isDuplicate && hashtag.length > 2) {
@@ -92,6 +92,7 @@ export const Trends24Source: TrendSource = {
               });
             }
           }
+          return true; // Continue iteration
         });
         
         console.log(`📊 TRENDS24: Found ${trends.length} trends with selector ${i + 1}`);

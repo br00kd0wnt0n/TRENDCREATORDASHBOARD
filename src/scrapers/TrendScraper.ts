@@ -3,7 +3,7 @@ import { AIEnrichmentService } from '../services/ai-enrichment';
 import { TrendSource, TrendData } from '../types';
 import { TikTokSource } from './sources/tiktok';
 import { PinterestSource } from './sources/pinterest';
-import { TwitterSource } from './sources/twitter';
+// import { TwitterSource } from './sources/twitter';
 import { Trends24Source } from './sources/trends24';
 import Trend from '../models/Trend';
 import { logger } from '../config/database';
@@ -321,10 +321,10 @@ export class TrendScraper {
     const hashtags = pageText.match(hashtagRegex) || [];
     
     const uniqueHashtags = [...new Set(hashtags)]
-      .filter(tag => tag.length > 2 && tag.length < 50)
+      .filter((tag: string) => tag.length > 2 && tag.length < 50)
       .slice(0, 5);
     
-    uniqueHashtags.forEach(hashtag => {
+    uniqueHashtags.forEach((hashtag: string) => {
       trends.push({
         hashtag: hashtag,
         popularity: 'Trending',
@@ -406,7 +406,7 @@ export class TrendScraper {
       /q=([^&\?]+)/g
     ];
     
-    $('a[href]').each((i: number, element: any) => {
+    $('a[href]').each((_i: number, element: any) => {
       const href = $(element).attr('href') || '';
       
       urlPatterns.forEach(pattern => {
