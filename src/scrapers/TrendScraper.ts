@@ -10,15 +10,7 @@ import { logger } from '../config/database';
 import axios from 'axios';
 import cron from 'node-cron';
 
-// Import progress updater
-let updateSourceProgress: Function | null = null;
-try {
-  const serverModule = require('../api/server');
-  updateSourceProgress = serverModule.updateSourceProgress;
-} catch (error) {
-  // Server module not available, progress updates will be skipped
-  console.log('Server module not available for progress updates');
-}
+import { progressManager } from '../utils/progress-manager';
 
 export class TrendScraper {
   private browserManager: BrowserManager;
@@ -81,12 +73,12 @@ export class TrendScraper {
           logger.info(`${sourceProgress} ⚙️  Method: ${source.scrapeMethod}`);
           
           // Update progress - source starting
-          updateSourceProgress?.(source.name, 'running', 0, 0, 'Initializing scraper...');
+          progressManager.updateSourceProgress(source.name, 'running', 0, 0, 'Initializing scraper...');
           
           const trends = await this.scrapeSource(source);
           
           // Update progress - scraping completed
-          updateSourceProgress?.(source.name, 'running', 50, trends.length, `Scraped ${trends.length} raw trends`);
+          progressManager.updateSourceProgress(source.name, 'running', 50, trends.length, `Scraped ${trends.length} raw trends`);
           scrapingStats.completedSources++;
           
           if (trends.length > 0) {
@@ -94,13 +86,13 @@ export class TrendScraper {
             logger.info(`${sourceProgress} 🧠 Starting AI analysis...`);
             
             // Update progress - AI analysis starting
-            updateSourceProgress?.(source.name, 'running', 70, trends.length, 'Running AI analysis...');
+            progressManager.updateSourceProgress(source.name, 'running', 70, trends.length, 'Running AI analysis...');
             
             const aiAnalyses = await this.aiService.analyzeTrends(trends);
             logger.info(`${sourceProgress} 🤖 AI analysis completed for ${aiAnalyses.size} trends`);
             
             // Update progress - saving to database
-            updateSourceProgress?.(source.name, 'running', 90, trends.length, 'Saving to database...');
+            progressManager.updateSourceProgress(source.name, 'running', 90, trends.length, 'Saving to database...');
             
             logger.info(`${sourceProgress} 💾 Saving enriched trends to database...`);
             const enrichedTrends = await this.saveEnrichedTrends(trends, aiAnalyses, source);
@@ -110,7 +102,7 @@ export class TrendScraper {
             logger.info(`${sourceProgress} ✨ Successfully processed ${enrichedTrends.length} trends from ${source.name}`);
             
             // Update progress - completed successfully
-            updateSourceProgress?.(source.name, 'completed', 100, enrichedTrends.length, `✅ Completed: ${enrichedTrends.length} trends saved`);
+            progressManager.updateSourceProgress(source.name, 'completed', 100, enrichedTrends.length, `✅ Completed: ${enrichedTrends.length} trends saved`);
             
             // Log sample trends for debugging
             if (enrichedTrends.length > 0) {
@@ -119,7 +111,7 @@ export class TrendScraper {
           } else {
             logger.warn(`${sourceProgress} ⚠️  No trends found for ${source.name} - check selectors or site structure`);
             // Update progress - completed with no results
-            updateSourceProgress?.(source.name, 'completed', 100, 0, '⚠️ No trends found - selectors may need updating');
+            progressManager.updateSourceProgress(source.name, 'completed', 100, 0, '⚠️ No trends found - selectors may need updating');
           }
 
         } catch (sourceError) {
@@ -128,7 +120,7 @@ export class TrendScraper {
           logger.error(`${sourceProgress} ❌ Failed to scrape ${source.name}:`, sourceError);
           
           // Update progress - failed
-          updateSourceProgress?.(source.name, 'failed', 0, 0, '❌ Scraping failed', errorMessage);
+          progressManager.updateSourceProgress(source.name, 'failed', 0, 0, '❌ Scraping failed', errorMessage);
           continue;
         }
 

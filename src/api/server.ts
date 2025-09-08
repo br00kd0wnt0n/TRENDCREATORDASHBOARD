@@ -28,29 +28,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(express.static(path.join(__dirname, '../../public')));
 
-// Functions to update scraping progress
-export function updateSourceProgress(sourceName: string, status: 'running' | 'completed' | 'failed', progress: number, trends: number, details?: string, error?: string) {
-  const sourceIndex = scrapingStatus.sources.findIndex(s => s.name.includes(sourceName.split(' ')[0]));
-  if (sourceIndex !== -1) {
-    scrapingStatus.sources[sourceIndex] = {
-      ...scrapingStatus.sources[sourceIndex],
-      status,
-      progress,
-      trends,
-      details,
-      error,
-      ...(status === 'running' ? { startTime: new Date() } : {}),
-      ...(status === 'completed' || status === 'failed' ? { completedTime: new Date() } : {})
-    };
-    
-    scrapingStatus.currentSource = status === 'running' ? sourceName : null;
-    scrapingStatus.completedSources = scrapingStatus.sources.filter(s => s.status === 'completed' || s.status === 'failed').length;
-    scrapingStatus.progress = (scrapingStatus.completedSources / scrapingStatus.totalSources) * 100;
-    scrapingStatus.lastUpdate = new Date();
-    
-    logger.info(`📊 Source progress: ${sourceName} - ${status} (${progress}%) - ${trends} trends - ${details || ''}`);
-  }
-}
+import { progressManager } from '../utils/progress-manager';
 
 const scraper = new TrendScraper();
 
@@ -206,103 +184,50 @@ app.get('/api/trends/search', async (_req, res) => {
   }
 });
 
-// Global scraping status tracking
-interface SourceProgress {
-  name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  progress: number;
-  trends: number;
-  error?: string;
-  startTime?: Date;
-  completedTime?: Date;
-  details?: string;
-}
-
-interface ScrapingStatus {
-  isRunning: boolean;
-  currentSource: string | null;
-  progress: number;
-  totalSources: number;
-  completedSources: number;
-  trends: any[];
-  errors: string[];
-  startTime: Date | null;
-  lastUpdate: Date | null;
-  sources: SourceProgress[];
-}
-
-let scrapingStatus: ScrapingStatus = {
-  isRunning: false,
-  currentSource: null,
-  progress: 0,
-  totalSources: 0,
-  completedSources: 0,
-  trends: [],
-  errors: [],
-  startTime: null,
-  lastUpdate: null,
-  sources: []
-};
+// Progress tracking is now handled by the ProgressManager singleton
 
 app.post('/api/scrape', async (_req, res) => {
   try {
-    if (scrapingStatus.isRunning) {
+    const currentStatus = progressManager.getStatus();
+    if (currentStatus.isRunning) {
       res.json({ 
         success: false, 
         message: 'Scraping already in progress',
-        status: scrapingStatus
+        status: currentStatus
       });
       return;
     }
 
     logger.info('Manual scraping initiated via API');
     
-    // Reset status
-    scrapingStatus = {
-      isRunning: true,
-      currentSource: null,
-      progress: 0,
-      totalSources: 3, // TikTok, Pinterest, Trends24
-      completedSources: 0,
-      trends: [],
-      errors: [],
-      startTime: new Date(),
-      lastUpdate: new Date(),
-      sources: [
-        { name: 'TikTok Creative Center', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
-        { name: 'Pinterest Trends', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
-        { name: 'Trends24 (X/Twitter US)', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' }
-      ]
-    };
+    // Initialize scraping progress
+    progressManager.initializeScraping();
     
     res.json({ 
       success: true, 
       message: 'Scraping started successfully',
-      status: scrapingStatus
+      status: progressManager.getStatus()
     });
 
     // Run scraping asynchronously
     const result = await scraper.scrapeAllSources();
     
     // Update final status
-    scrapingStatus.isRunning = false;
-    scrapingStatus.progress = 100;
-    scrapingStatus.trends = result.trends;
-    scrapingStatus.lastUpdate = new Date();
+    progressManager.completeScraping(result.trends);
     
     logger.info(`Manual scraping completed: ${result.trends.length} trends`);
   } catch (error) {
     logger.error('Manual scraping failed:', error);
-    scrapingStatus.isRunning = false;
-    scrapingStatus.errors.push(error instanceof Error ? error.message : 'Unknown error');
-    scrapingStatus.lastUpdate = new Date();
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    progressManager.addError(errorMessage);
+    progressManager.completeScraping([]);
   }
 });
 
 app.get('/api/scrape/status', (_req, res) => {
   res.json({
     success: true,
-    data: scrapingStatus
+    data: progressManager.getStatus()
   });
 });
 
