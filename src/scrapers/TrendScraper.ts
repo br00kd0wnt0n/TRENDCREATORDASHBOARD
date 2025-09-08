@@ -343,7 +343,7 @@ export class TrendScraper {
     const hashtags = pageText.match(hashtagRegex) || [];
     
     const hashtagSet = new Set(hashtags);
-    const hashtagArray = Array.from(hashtagSet);
+    const hashtagArray = Array.from(hashtagSet) as string[];
     const uniqueHashtags = hashtagArray
       .filter((tag: string) => tag.length > 2 && tag.length < 50)
       .slice(0, 5);
