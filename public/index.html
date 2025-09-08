@@ -527,6 +527,11 @@
                 if (data.success) {
                     updateProgressModal('🚀 Scraping started successfully!', 0, 'Preparing to scrape sources...');
                     
+                    // Initialize source progress display with pending sources
+                    if (data.status && data.status.sources) {
+                        updateSourcesProgress(data.status.sources);
+                    }
+                    
                     // Start polling for status updates
                     statusInterval = setInterval(checkScrapingStatus, 2000);
                     
@@ -556,28 +561,41 @@
                     const status = data.data;
                     
                     if (status.isRunning) {
-                        const progress = (status.completedSources / status.totalSources) * 100;
+                        const progress = Math.round((status.completedSources / status.totalSources) * 100);
                         const currentSource = status.currentSource || 'Processing...';
+                        
+                        // Update overall progress
                         updateProgressModal(
-                            `🎯 Scraping ${currentSource}`,
+                            `🎯 Scraping in Progress`,
                             progress,
-                            `Completed ${status.completedSources}/${status.totalSources} sources`
+                            `Completed ${status.completedSources}/${status.totalSources} sources - Current: ${currentSource}`
                         );
+                        
+                        // Update detailed source progress
+                        if (status.sources && status.sources.length > 0) {
+                            updateSourcesProgress(status.sources);
+                        }
                     } else {
                         // Scraping completed
                         clearInterval(statusInterval);
-                        const finalMessage = status.trends.length > 0 
-                            ? `✅ Scraping completed! Found ${status.trends.length} trends`
+                        const totalTrends = status.sources ? status.sources.reduce((sum, s) => sum + s.trends, 0) : status.trends.length;
+                        const finalMessage = totalTrends > 0 
+                            ? `✅ Scraping completed! Found ${totalTrends} trends`
                             : '⚠️ Scraping completed but no trends found';
                         
                         updateProgressModal(finalMessage, 100, 'Refreshing dashboard...');
+                        
+                        // Update final source states
+                        if (status.sources && status.sources.length > 0) {
+                            updateSourcesProgress(status.sources);
+                        }
                         
                         setTimeout(() => {
                             hideProgressModal();
                             resetScrapeButton();
                             loadStats();
                             loadTrends();
-                        }, 2000);
+                        }, 3000);
                     }
                 }
             } catch (error) {
@@ -601,33 +619,52 @@
                     align-items: center;
                     justify-content: center;
                     z-index: 1000;
+                    overflow-y: auto;
                 ">
                     <div style="
                         background: white;
                         padding: 30px;
                         border-radius: 15px;
                         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                        min-width: 400px;
-                        text-align: center;
+                        min-width: 500px;
+                        max-width: 700px;
+                        text-align: left;
+                        margin: 20px;
+                        max-height: 90vh;
+                        overflow-y: auto;
                     ">
-                        <h3 id="progress-title" style="margin-bottom: 20px; color: #333;">🚀 Starting Scrape...</h3>
-                        <div style="
-                            width: 100%;
-                            height: 20px;
-                            background: #f0f0f0;
-                            border-radius: 10px;
-                            overflow: hidden;
-                            margin-bottom: 15px;
-                        ">
-                            <div id="progress-bar" style="
-                                width: 0%;
-                                height: 100%;
-                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                transition: width 0.3s ease;
-                            "></div>
+                        <h3 id="progress-title" style="margin-bottom: 20px; color: #333; text-align: center;">🚀 Starting Scrape...</h3>
+                        
+                        <!-- Overall Progress -->
+                        <div style="margin-bottom: 20px;">
+                            <div style="
+                                width: 100%;
+                                height: 20px;
+                                background: #f0f0f0;
+                                border-radius: 10px;
+                                overflow: hidden;
+                                margin-bottom: 10px;
+                            ">
+                                <div id="progress-bar" style="
+                                    width: 0%;
+                                    height: 100%;
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    transition: width 0.3s ease;
+                                "></div>
+                            </div>
+                            <div id="progress-status" style="color: #666; font-size: 14px; text-align: center;">Initializing...</div>
                         </div>
-                        <div id="progress-status" style="color: #666; font-size: 14px;">Initializing...</div>
-                        <div id="progress-details" style="color: #999; font-size: 12px; margin-top: 10px;">Please wait while we gather trend data</div>
+
+                        <!-- Source-by-Source Progress -->
+                        <div id="sources-container" style="
+                            border-top: 2px solid #f0f0f0;
+                            padding-top: 15px;
+                        ">
+                            <h4 style="margin-bottom: 15px; color: #555; font-size: 16px;">📊 Source Progress</h4>
+                            <div id="sources-list">
+                                <!-- Sources will be populated dynamically -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -638,12 +675,93 @@
             const titleEl = document.getElementById('progress-title');
             const barEl = document.getElementById('progress-bar');
             const statusEl = document.getElementById('progress-status');
-            const detailsEl = document.getElementById('progress-details');
             
             if (titleEl) titleEl.textContent = title;
             if (barEl) barEl.style.width = progress + '%';
             if (statusEl) statusEl.textContent = status;
-            if (detailsEl && details) detailsEl.textContent = details;
+        }
+
+        function updateSourcesProgress(sources) {
+            const sourcesListEl = document.getElementById('sources-list');
+            if (!sourcesListEl) return;
+
+            const sourcesHTML = sources.map(source => {
+                const statusIcon = {
+                    'pending': '⏳',
+                    'running': '🚀',
+                    'completed': '✅',
+                    'failed': '❌'
+                }[source.status] || '⏳';
+
+                const statusColor = {
+                    'pending': '#999',
+                    'running': '#007bff',
+                    'completed': '#28a745',
+                    'failed': '#dc3545'
+                }[source.status] || '#999';
+
+                const progressBarColor = {
+                    'pending': '#e9ecef',
+                    'running': '#007bff',
+                    'completed': '#28a745',
+                    'failed': '#dc3545'
+                }[source.status] || '#e9ecef';
+
+                return `
+                    <div style="
+                        margin-bottom: 15px;
+                        padding: 15px;
+                        background: #f8f9fa;
+                        border-radius: 8px;
+                        border-left: 4px solid ${statusColor};
+                    ">
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 8px;
+                        ">
+                            <strong style="color: #333; font-size: 14px;">
+                                ${statusIcon} ${source.name}
+                            </strong>
+                            <span style="
+                                color: ${statusColor};
+                                font-size: 12px;
+                                font-weight: bold;
+                            ">
+                                ${source.trends} trends
+                            </span>
+                        </div>
+                        
+                        <!-- Source Progress Bar -->
+                        <div style="
+                            width: 100%;
+                            height: 8px;
+                            background: #e9ecef;
+                            border-radius: 4px;
+                            overflow: hidden;
+                            margin-bottom: 8px;
+                        ">
+                            <div style="
+                                width: ${source.progress}%;
+                                height: 100%;
+                                background: ${progressBarColor};
+                                transition: width 0.3s ease;
+                            "></div>
+                        </div>
+                        
+                        <div style="
+                            color: #666;
+                            font-size: 12px;
+                        ">
+                            ${source.details || 'Waiting...'}
+                            ${source.error ? `<br><span style="color: #dc3545;">Error: ${source.error}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            sourcesListEl.innerHTML = sourcesHTML;
         }
 
         function hideProgressModal() {

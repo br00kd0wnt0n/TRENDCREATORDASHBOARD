@@ -28,6 +28,30 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(express.static(path.join(__dirname, '../../public')));
 
+// Functions to update scraping progress
+export function updateSourceProgress(sourceName: string, status: 'running' | 'completed' | 'failed', progress: number, trends: number, details?: string, error?: string) {
+  const sourceIndex = scrapingStatus.sources.findIndex(s => s.name.includes(sourceName.split(' ')[0]));
+  if (sourceIndex !== -1) {
+    scrapingStatus.sources[sourceIndex] = {
+      ...scrapingStatus.sources[sourceIndex],
+      status,
+      progress,
+      trends,
+      details,
+      error,
+      ...(status === 'running' ? { startTime: new Date() } : {}),
+      ...(status === 'completed' || status === 'failed' ? { completedTime: new Date() } : {})
+    };
+    
+    scrapingStatus.currentSource = status === 'running' ? sourceName : null;
+    scrapingStatus.completedSources = scrapingStatus.sources.filter(s => s.status === 'completed' || s.status === 'failed').length;
+    scrapingStatus.progress = (scrapingStatus.completedSources / scrapingStatus.totalSources) * 100;
+    scrapingStatus.lastUpdate = new Date();
+    
+    logger.info(`📊 Source progress: ${sourceName} - ${status} (${progress}%) - ${trends} trends - ${details || ''}`);
+  }
+}
+
 const scraper = new TrendScraper();
 
 // Health check endpoints
@@ -183,6 +207,17 @@ app.get('/api/trends/search', async (_req, res) => {
 });
 
 // Global scraping status tracking
+interface SourceProgress {
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress: number;
+  trends: number;
+  error?: string;
+  startTime?: Date;
+  completedTime?: Date;
+  details?: string;
+}
+
 interface ScrapingStatus {
   isRunning: boolean;
   currentSource: string | null;
@@ -193,6 +228,7 @@ interface ScrapingStatus {
   errors: string[];
   startTime: Date | null;
   lastUpdate: Date | null;
+  sources: SourceProgress[];
 }
 
 let scrapingStatus: ScrapingStatus = {
@@ -204,7 +240,8 @@ let scrapingStatus: ScrapingStatus = {
   trends: [],
   errors: [],
   startTime: null,
-  lastUpdate: null
+  lastUpdate: null,
+  sources: []
 };
 
 app.post('/api/scrape', async (_req, res) => {
@@ -225,12 +262,17 @@ app.post('/api/scrape', async (_req, res) => {
       isRunning: true,
       currentSource: null,
       progress: 0,
-      totalSources: 3, // TikTok, Pinterest, Twitter
+      totalSources: 3, // TikTok, Pinterest, Trends24
       completedSources: 0,
       trends: [],
       errors: [],
       startTime: new Date(),
-      lastUpdate: new Date()
+      lastUpdate: new Date(),
+      sources: [
+        { name: 'TikTok Creative Center', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
+        { name: 'Pinterest Trends', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
+        { name: 'Trends24 (X/Twitter US)', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' }
+      ]
     };
     
     res.json({ 
