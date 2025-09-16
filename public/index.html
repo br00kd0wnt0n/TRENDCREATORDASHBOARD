@@ -550,10 +550,12 @@
                 let insights;
 
                 if (currentTab === 'trends') {
-                    // Get data for trends analysis
+                    // Get TRENDS data when on trends tab
                     const trendsData = specificItem && specificItem.type === 'trend' ?
-                        [specificItem.data] : await fetchTrendsData();
+                        [specificItem.data] : await fetchCurrentTrendData();
                     const creatorsContext = await fetchCreatorsData();
+
+                    console.log('Generating trend-to-creator insights with:', trendsData.length, 'trends');
 
                     insights = await fetch('/api/crossover/insights', {
                         method: 'POST',
@@ -562,16 +564,19 @@
                             type: 'trend-to-creators',
                             data: trendsData,
                             context: creatorsContext,
-                            specific: specificItem ? true : false
+                            specific: specificItem ? true : false,
+                            tabContext: 'trends'
                         })
                     }).then(r => r.json());
 
                     renderTrendToCreatorInsights(insights, specificItem);
-                } else {
-                    // Get data for creator analysis
+                } else if (currentTab === 'creators') {
+                    // Get CREATOR data when on creators tab
                     const creatorsData = specificItem && specificItem.type === 'creator' ?
-                        [specificItem.data] : await fetchCreatorsData();
+                        [specificItem.data] : await fetchCurrentCreatorData();
                     const trendsContext = await fetchTrendsData();
+
+                    console.log('Generating creator-to-trend insights with:', creatorsData.length, 'creators');
 
                     insights = await fetch('/api/crossover/insights', {
                         method: 'POST',
@@ -580,7 +585,8 @@
                             type: 'creator-to-trends',
                             data: creatorsData,
                             context: trendsContext,
-                            specific: specificItem ? true : false
+                            specific: specificItem ? true : false,
+                            tabContext: 'creators'
                         })
                     }).then(r => r.json());
 
@@ -768,6 +774,7 @@
             try {
                 const response = await fetch('/api/trends/trends?limit=10');
                 const data = await response.json();
+                console.log('Fetched trends data:', data.data?.length || 0, 'trends');
                 return data.data || [];
             } catch (error) {
                 console.error('Failed to fetch trends:', error);
@@ -779,7 +786,9 @@
             try {
                 const response = await fetch('/api/creators/creators?limit=10');
                 const data = await response.json();
-                return data.data || data || [];
+                const creators = data.creators || data.data || data || [];
+                console.log('Fetched creators data:', creators.length || 0, 'creators');
+                return creators;
             } catch (error) {
                 console.error('Failed to fetch creators:', error);
                 return [];
@@ -787,8 +796,21 @@
         }
 
         async function fetchCurrentCreatorData() {
-            // This would be enhanced to get the currently viewed creator
+            // Get the currently selected creator or all creators
+            if (selectedCreator) {
+                console.log('Using selected creator:', selectedCreator.full_name || selectedCreator.name);
+                return [selectedCreator];
+            }
             return await fetchCreatorsData();
+        }
+
+        async function fetchCurrentTrendData() {
+            // Get the currently selected trend or all trends
+            if (selectedTrend) {
+                console.log('Using selected trend:', selectedTrend.hashtag);
+                return [selectedTrend];
+            }
+            return await fetchTrendsData();
         }
 
         // Update counters

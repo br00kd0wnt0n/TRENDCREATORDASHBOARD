@@ -119,7 +119,14 @@ app.get('/api/creators/*', async (req, res) => {
 // AI-powered crossover insights endpoint
 app.post('/api/crossover/insights', async (req, res) => {
   try {
-    const { type, data, context } = req.body;
+    const { type, data, context, specific, tabContext } = req.body;
+
+    console.log(`Generating ${type} insights:`, {
+      dataCount: data?.length || 0,
+      contextCount: context?.length || 0,
+      specific,
+      tabContext
+    });
 
     if (!process.env.OPENAI_API_KEY) {
       return res.json({
@@ -129,12 +136,15 @@ app.post('/api/crossover/insights', async (req, res) => {
       });
     }
 
-    const cacheKey = `${type}_${JSON.stringify(data)}_${context}`;
+    // Create cache key that includes tab context and specific flag
+    const cacheKey = `${type}_${specific ? 'specific' : 'general'}_${tabContext}_${JSON.stringify(data?.slice(0, 3))}_${Date.now() > (Date.now() - 300000) ? 'recent' : 'old'}`;
 
-    // Check cache first
+    // Check cache first (but with shorter TTL for specific insights)
+    const cacheTTL = specific ? 60000 : CACHE_TTL; // 1 minute for specific, 5 minutes for general
     if (insightsCache.has(cacheKey)) {
       const cached = insightsCache.get(cacheKey);
-      if (Date.now() - cached.timestamp < CACHE_TTL) {
+      if (Date.now() - cached.timestamp < cacheTTL) {
+        console.log('Returning cached insights');
         return res.json(cached.data);
       }
     }
@@ -142,9 +152,9 @@ app.post('/api/crossover/insights', async (req, res) => {
     let insights;
 
     if (type === 'trend-to-creators') {
-      insights = await generateTrendToCreatorInsights(data, context);
+      insights = await generateTrendToCreatorInsights(data, context, specific, tabContext);
     } else if (type === 'creator-to-trends') {
-      insights = await generateCreatorToTrendInsights(data, context);
+      insights = await generateCreatorToTrendInsights(data, context, specific, tabContext);
     } else {
       throw new Error('Invalid insight type');
     }
@@ -167,15 +177,18 @@ app.post('/api/crossover/insights', async (req, res) => {
 });
 
 // Generate trend-to-creator insights using OpenAI
-async function generateTrendToCreatorInsights(trendData, creatorsContext) {
-  const prompt = `
-As an expert in social media marketing and creator partnerships, analyze this trending content and suggest relevant creators for brand partnerships.
+async function generateTrendToCreatorInsights(trendData, creatorsContext, specific = false, tabContext = '') {
+  const isSpecificTrend = specific && trendData.length === 1;
+  const trendCount = trendData.length;
 
-TRENDING DATA:
+  const prompt = `
+As an expert in social media marketing and creator partnerships, analyze ${isSpecificTrend ? 'this specific trend' : `these ${trendCount} trending topics`} and suggest relevant creators for brand partnerships.
+
+${isSpecificTrend ? 'SPECIFIC TREND BEING ANALYZED:' : `TOP ${trendCount} TRENDING DATA:`}
 ${JSON.stringify(trendData, null, 2)}
 
 AVAILABLE CREATORS CONTEXT:
-${JSON.stringify(creatorsContext, null, 2)}
+${JSON.stringify(creatorsContext.slice(0, 15), null, 2)}
 
 Please provide:
 1. Top 3-5 creators who would be best suited for this trend
@@ -226,15 +239,18 @@ Format as JSON with this structure:
 }
 
 // Generate creator-to-trend insights using OpenAI
-async function generateCreatorToTrendInsights(creatorData, trendsContext) {
-  const prompt = `
-As an expert in social media trends and creator strategy, analyze this creator's profile and suggest trending topics they should leverage.
+async function generateCreatorToTrendInsights(creatorData, trendsContext, specific = false, tabContext = '') {
+  const isSpecificCreator = specific && creatorData.length === 1;
+  const creatorCount = creatorData.length;
 
-CREATOR DATA:
+  const prompt = `
+As an expert in social media trends and creator strategy, analyze ${isSpecificCreator ? 'this specific creator\'s profile' : `these ${creatorCount} creators`} and suggest trending topics they should leverage.
+
+${isSpecificCreator ? 'SPECIFIC CREATOR BEING ANALYZED:' : `${creatorCount} CREATORS IN ANALYSIS:`}
 ${JSON.stringify(creatorData, null, 2)}
 
 CURRENT TRENDING TOPICS:
-${JSON.stringify(trendsContext, null, 2)}
+${JSON.stringify(trendsContext.slice(0, 15), null, 2)}
 
 Please provide:
 1. Top 5 trending topics this creator should leverage
