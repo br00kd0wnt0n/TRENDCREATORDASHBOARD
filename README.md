@@ -2,6 +2,8 @@
 
 A unified container application that combines **RalphLovesTrends** (trend analysis) and **RalphODex** (creator database) with AI-powered crossover insights using OpenAI GPT-4.
 
+🌐 **Live Demo**: [https://trendcreatordashboard.up.railway.app](https://trendcreatordashboard.up.railway.app)
+
 ## ✨ Key Features
 
 ### 🖼️ **Iframe Integration**
@@ -220,10 +222,30 @@ NODE_ENV=development npm run dev
 
 ## 🚀 Deployment
 
-### Railway/Production
-1. Set environment variables in deployment platform
-2. Ensure all three services are deployed and accessible
-3. Update URLs in production environment
+### Railway Production Setup
+
+The dashboard is deployed at: **https://trendcreatordashboard.up.railway.app**
+
+#### Required Environment Variables in Railway:
+
+```env
+# OpenAI API (REQUIRED for AI features)
+OPENAI_API_KEY=sk-your-actual-openai-api-key
+
+# Your Deployed Tool URLs
+TRENDS_URL=https://ralphretronet-production.up.railway.app
+CREATORS_URL=https://ralphodex.up.railway.app
+
+# API Endpoints
+TRENDS_API_URL=https://ralphretronet-production.up.railway.app/api
+CREATORS_API_URL=https://backend-production-a0a1.up.railway.app/api
+```
+
+#### Deployment Steps:
+1. Connect GitHub repo to Railway
+2. Add environment variables in Railway dashboard
+3. Deploy automatically on push
+4. Access at your Railway URL
 
 ### Docker (Optional)
 ```dockerfile
