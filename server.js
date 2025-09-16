@@ -33,8 +33,29 @@ app.use(helmet({
   frameguard: false // Allow iframes
 }));
 
+// Allow CORS from both local and production URLs
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:30003',
+  'https://trendcreatordashboard.up.railway.app',
+  'https://ralphlovestrends-production.up.railway.app',
+  'https://ralphodex.up.railway.app',
+  'https://backend-production-a0a1.up.railway.app'
+];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:30003', 'http://localhost:3002'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins in production for now
+    }
+  },
   credentials: true
 }));
 

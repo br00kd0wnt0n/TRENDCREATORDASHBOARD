@@ -376,7 +376,7 @@
                 <iframe
                     id="trends-frame"
                     class="tool-frame"
-                    src="http://localhost:30003"
+                    src=""
                     title="Ralph Loves Trends">
                 </iframe>
             </div>
@@ -386,7 +386,7 @@
                 <iframe
                     id="creators-frame"
                     class="tool-frame"
-                    src="http://localhost:3000"
+                    src=""
                     title="Ralph Creator Rolodex">
                 </iframe>
             </div>
@@ -427,6 +427,19 @@
         const crossoverContent = document.getElementById('crossoverContent');
         const trendsFrame = document.getElementById('trends-frame');
         const creatorsFrame = document.getElementById('creators-frame');
+
+        // Determine environment and set iframe URLs
+        const isProduction = window.location.hostname !== 'localhost';
+        const trendsUrl = isProduction ?
+            'https://ralphlovestrends-production.up.railway.app' :
+            'http://localhost:30003';
+        const creatorsUrl = isProduction ?
+            'https://ralphodex.up.railway.app' :
+            'http://localhost:3000';
+
+        // Set iframe sources
+        trendsFrame.src = trendsUrl;
+        creatorsFrame.src = creatorsUrl;
 
         // State management
         let currentTab = 'trends';
