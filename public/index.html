@@ -160,7 +160,7 @@
         /* Crossover Panel */
         .crossover-panel {
             position: fixed;
-            right: -400px;
+            right: 0;  /* Open by default */
             top: 0;
             width: 400px;
             height: 100vh;
@@ -172,8 +172,8 @@
             overflow-y: auto;
         }
 
-        .crossover-panel.open {
-            right: 0;
+        .crossover-panel.collapsed {
+            right: -400px;
         }
 
         .crossover-header {
@@ -183,6 +183,34 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .crossover-header-content {
+            flex: 1;
+        }
+
+        .close-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            margin-left: 16px;
+        }
+
+        .close-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
         }
 
         .crossover-content {
@@ -398,11 +426,16 @@
         <i class="fas fa-magic"></i>
     </button>
 
-    <!-- Crossover Panel -->
+    <!-- Crossover Panel (open by default) -->
     <div class="crossover-panel" id="crossoverPanel">
         <div class="crossover-header">
-            <h2><i class="fas fa-brain"></i> AI Crossover Insights</h2>
-            <p>Intelligent connections between trends and creators</p>
+            <div class="crossover-header-content">
+                <h2><i class="fas fa-brain"></i> AI Crossover Insights</h2>
+                <p>Intelligent connections between trends and creators</p>
+            </div>
+            <button class="close-button" id="closePanel" title="Minimize panel">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         <div class="crossover-content" id="crossoverContent">
             <div class="loading">
@@ -425,6 +458,7 @@
         const crossoverToggle = document.getElementById('crossoverToggle');
         const crossoverPanel = document.getElementById('crossoverPanel');
         const crossoverContent = document.getElementById('crossoverContent');
+        const closePanel = document.getElementById('closePanel');
         const trendsFrame = document.getElementById('trends-frame');
         const creatorsFrame = document.getElementById('creators-frame');
 
@@ -470,12 +504,28 @@
             generateCrossoverInsights();
         }
 
-        // Crossover panel toggle
+        // Crossover panel toggle (open/close)
         crossoverToggle.addEventListener('click', () => {
-            crossoverPanel.classList.toggle('open');
-            if (crossoverPanel.classList.contains('open')) {
+            crossoverPanel.classList.toggle('collapsed');
+
+            // Update toggle button icon based on state
+            const icon = crossoverToggle.querySelector('i');
+            if (crossoverPanel.classList.contains('collapsed')) {
+                icon.className = 'fas fa-chevron-left';
+                crossoverToggle.title = 'Open AI Insights';
+            } else {
+                icon.className = 'fas fa-magic';
+                crossoverToggle.title = 'Close AI Insights';
                 generateCrossoverInsights();
             }
+        });
+
+        // Close button in panel header
+        closePanel.addEventListener('click', () => {
+            crossoverPanel.classList.add('collapsed');
+            const icon = crossoverToggle.querySelector('i');
+            icon.className = 'fas fa-chevron-left';
+            crossoverToggle.title = 'Open AI Insights';
         });
 
         // Track selected items
@@ -801,6 +851,11 @@
             await updateCounts();
             await checkConnectionStatus();
 
+            // Generate initial insights since panel is open by default
+            setTimeout(() => {
+                generateCrossoverInsights();
+            }, 1000);
+
             // Auto-refresh every 30 seconds
             setInterval(updateCounts, 30000);
             setInterval(checkConnectionStatus, 10000);
@@ -812,7 +867,7 @@
             if (event.data.type === 'trend-selected') {
                 console.log('Trend selected:', event.data);
                 selectedTrend = event.data.data;
-                if (crossoverPanel.classList.contains('open')) {
+                if (!crossoverPanel.classList.contains('collapsed')) {
                     generateCrossoverInsights({
                         type: 'trend',
                         data: selectedTrend,
@@ -822,7 +877,7 @@
             } else if (event.data.type === 'creator-selected') {
                 console.log('Creator selected:', event.data);
                 selectedCreator = event.data.data;
-                if (crossoverPanel.classList.contains('open')) {
+                if (!crossoverPanel.classList.contains('collapsed')) {
                     generateCrossoverInsights({
                         type: 'creator',
                         data: selectedCreator,
@@ -889,7 +944,7 @@
                 const creator = await response.json();
                 if (creator) {
                     selectedCreator = creator;
-                    if (crossoverPanel.classList.contains('open') && currentTab === 'creators') {
+                    if (!crossoverPanel.classList.contains('collapsed') && currentTab === 'creators') {
                         generateCrossoverInsights({
                             type: 'creator',
                             data: creator,
