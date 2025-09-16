@@ -15,11 +15,18 @@ const PORT = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '30003')
 
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  frameguard: false // Disable X-Frame-Options to allow iframe embedding
 }));
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'https://trendcreatordashboard.up.railway.app',
+    'https://ralphlovestrends-production.up.railway.app'
+  ],
   credentials: true
 }));
 
