@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ralph Unified Dashboard - Trends & Creators Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .dashboard-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #EB008B;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo h1 {
+            color: #EB008B;
+            font-weight: 700;
+            font-size: 24px;
+        }
+
+        .logo .icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, #EB008B, #31BDBF);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+
+        .crossover-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(49, 189, 191, 0.1);
+            border-radius: 20px;
+            border: 1px solid #31BDBF;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            background: #31BDBF;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Tab Navigation */
+        .tab-navigation {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 0 2rem;
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-button {
+            padding: 16px 32px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .tab-button.active {
+            color: #EB008B;
+            border-bottom-color: #EB008B;
+            background: rgba(235, 0, 139, 0.05);
+        }
+
+        .tab-button:hover {
+            background: rgba(235, 0, 139, 0.05);
+            color: #EB008B;
+        }
+
+        .tab-button .badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #F16524;
+            color: white;
+            border-radius: 10px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Tool Iframes */
+        .tool-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .tab-content {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Crossover Panel */
+        .crossover-panel {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 400px;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            box-shadow: -5px 0 30px rgba(0, 0, 0, 0.2);
+            transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .crossover-panel.open {
+            right: 0;
+        }
+
+        .crossover-header {
+            padding: 24px;
+            background: linear-gradient(135deg, #EB008B, #31BDBF);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .crossover-content {
+            padding: 24px;
+        }
+
+        .insight-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid #EB008B;
+        }
+
+        .insight-card h3 {
+            color: #EB008B;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .insight-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .recommendation-list {
+            list-style: none;
+        }
+
+        .recommendation-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .match-score {
+            background: linear-gradient(45deg, #31BDBF, #F16524);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 45px;
+            text-align: center;
+        }
+
+        /* Toggle Button */
+        .crossover-toggle {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: linear-gradient(45deg, #EB008B, #31BDBF);
+            color: white;
+            border: none;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(235, 0, 139, 0.3);
+            z-index: 999;
+            transition: all 0.3s ease;
+            font-size: 20px;
+        }
+
+        .crossover-toggle:hover {
+            transform: translateY(-50%) scale(1.1);
+            box-shadow: 0 6px 30px rgba(235, 0, 139, 0.4);
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #EB008B;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .tab-navigation {
+                padding: 0 1rem;
+            }
+
+            .tab-button {
+                padding: 12px 16px;
+                font-size: 14px;
+            }
+
+            .crossover-panel {
+                width: 100%;
+                right: -100%;
+            }
+
+            .crossover-toggle {
+                right: 16px;
+                width: 50px;
+                height: 50px;
+                font-size: 16px;
+            }
+        }
+
+        /* Connection Status */
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #31BDBF;
+        }
+
+        .connection-dot.error {
+            background: #ff4757;
+        }
+
+        .connection-dot.warning {
+            background: #ffa502;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h1>Ralph Unified Dashboard</h1>
+            </div>
+
+            <div class="connection-status">
+                <div class="connection-dot" id="trendsStatus"></div>
+                <span>Trends</span>
+                <div class="connection-dot" id="creatorsStatus"></div>
+                <span>Creators</span>
+                <div class="crossover-status">
+                    <div class="status-indicator"></div>
+                    <span>AI Crossover Active</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-navigation">
+            <button class="tab-button active" data-tab="trends">
+                <i class="fas fa-trending-up"></i>
+                Trend Analysis
+                <span class="badge" id="trendsCount">0</span>
+            </button>
+            <button class="tab-button" data-tab="creators">
+                <i class="fas fa-users"></i>
+                Creator Rolodex
+                <span class="badge" id="creatorsCount">0</span>
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Trends Tab -->
+            <div class="tab-content active" id="trends-tab">
+                <iframe
+                    id="trends-frame"
+                    class="tool-frame"
+                    src="http://localhost:30003"
+                    title="Ralph Loves Trends">
+                </iframe>
+            </div>
+
+            <!-- Creators Tab -->
+            <div class="tab-content" id="creators-tab">
+                <iframe
+                    id="creators-frame"
+                    class="tool-frame"
+                    src="http://localhost:3000"
+                    title="Ralph Creator Rolodex">
+                </iframe>
+            </div>
+        </main>
+    </div>
+
+    <!-- Crossover Toggle Button -->
+    <button class="crossover-toggle" id="crossoverToggle">
+        <i class="fas fa-magic"></i>
+    </button>
+
+    <!-- Crossover Panel -->
+    <div class="crossover-panel" id="crossoverPanel">
+        <div class="crossover-header">
+            <h2><i class="fas fa-brain"></i> AI Crossover Insights</h2>
+            <p>Intelligent connections between trends and creators</p>
+        </div>
+        <div class="crossover-content" id="crossoverContent">
+            <div class="loading">
+                <div class="spinner"></div>
+                Analyzing connections...
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.IO for real-time updates -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        // Initialize socket connection
+        const socket = io();
+
+        // DOM elements
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const crossoverToggle = document.getElementById('crossoverToggle');
+        const crossoverPanel = document.getElementById('crossoverPanel');
+        const crossoverContent = document.getElementById('crossoverContent');
+        const trendsFrame = document.getElementById('trends-frame');
+        const creatorsFrame = document.getElementById('creators-frame');
+
+        // State management
+        let currentTab = 'trends';
+        let insightsCache = new Map();
+        let lastUpdateTime = Date.now();
+
+        // Tab switching functionality
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.dataset.tab;
+                switchTab(targetTab);
+            });
+        });
+
+        function switchTab(tabName) {
+            // Update active states
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+
+            currentTab = tabName;
+
+            // Trigger crossover insights for the new tab
+            generateCrossoverInsights();
+        }
+
+        // Crossover panel toggle
+        crossoverToggle.addEventListener('click', () => {
+            crossoverPanel.classList.toggle('open');
+            if (crossoverPanel.classList.contains('open')) {
+                generateCrossoverInsights();
+            }
+        });
+
+        // Generate AI-powered crossover insights
+        async function generateCrossoverInsights() {
+            try {
+                crossoverContent.innerHTML = '<div class="loading"><div class="spinner"></div>Generating AI insights...</div>';
+
+                let insights;
+
+                if (currentTab === 'trends') {
+                    // Get current trending data and suggest creators
+                    const trendsData = await fetchTrendsData();
+                    const creatorsContext = await fetchCreatorsData();
+
+                    insights = await fetch('/api/crossover/insights', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'trend-to-creators',
+                            data: trendsData,
+                            context: creatorsContext
+                        })
+                    }).then(r => r.json());
+
+                    renderTrendToCreatorInsights(insights);
+                } else {
+                    // Get creator data and suggest trending topics
+                    const creatorsData = await fetchCurrentCreatorData();
+                    const trendsContext = await fetchTrendsData();
+
+                    insights = await fetch('/api/crossover/insights', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'creator-to-trends',
+                            data: creatorsData,
+                            context: trendsContext
+                        })
+                    }).then(r => r.json());
+
+                    renderCreatorToTrendInsights(insights);
+                }
+
+            } catch (error) {
+                console.error('Failed to generate insights:', error);
+                crossoverContent.innerHTML = `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-exclamation-triangle"></i> Unable to Generate Insights</h3>
+                        <p>There was an issue connecting to the AI service. Please check your OpenAI API configuration.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Render trend-to-creator insights
+        function renderTrendToCreatorInsights(response) {
+            if (!response.success && response.fallback) {
+                response.insights = response.fallback;
+            }
+
+            const insights = response.insights || {};
+
+            let html = `
+                <div class="insight-card">
+                    <h3><i class="fas fa-lightbulb"></i> Trend Analysis</h3>
+                    <p>${insights.trendInsights || 'No insights available'}</p>
+                </div>
+            `;
+
+            if (insights.recommendedCreators && insights.recommendedCreators.length > 0) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-users"></i> Recommended Creators</h3>
+                        <ul class="recommendation-list">
+                `;
+
+                insights.recommendedCreators.forEach(creator => {
+                    html += `
+                        <li>
+                            <span class="match-score">${Math.round((creator.matchScore || 0.5) * 100)}%</span>
+                            <div>
+                                <strong>${creator.creatorName || 'Creator'}</strong><br>
+                                <small>${creator.reasoning || 'Good match for current trends'}</small>
+                            </div>
+                        </li>
+                    `;
+                });
+
+                html += '</ul></div>';
+            }
+
+            if (insights.marketingOpportunities && insights.marketingOpportunities.length > 0) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-rocket"></i> Marketing Opportunities</h3>
+                        <ul>
+                `;
+
+                insights.marketingOpportunities.forEach(opportunity => {
+                    html += `<li><i class="fas fa-arrow-right"></i> ${opportunity}</li>`;
+                });
+
+                html += '</ul></div>';
+            }
+
+            crossoverContent.innerHTML = html;
+        }
+
+        // Render creator-to-trend insights
+        function renderCreatorToTrendInsights(response) {
+            if (!response.success && response.fallback) {
+                response.insights = response.fallback;
+            }
+
+            const insights = response.insights || {};
+
+            let html = `
+                <div class="insight-card">
+                    <h3><i class="fas fa-user-cog"></i> Creator Strategy</h3>
+                    <p>${insights.creatorInsights || 'No insights available'}</p>
+                </div>
+            `;
+
+            if (insights.recommendedTrends && insights.recommendedTrends.length > 0) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-hashtag"></i> Trending Opportunities</h3>
+                        <ul class="recommendation-list">
+                `;
+
+                insights.recommendedTrends.forEach(trend => {
+                    html += `
+                        <li>
+                            <span class="match-score">${Math.round((trend.matchScore || 0.5) * 100)}%</span>
+                            <div>
+                                <strong>${trend.hashtag || '#trending'}</strong><br>
+                                <small>${trend.reasoning || 'Relevant to creator audience'}</small>
+                            </div>
+                        </li>
+                    `;
+                });
+
+                html += '</ul></div>';
+            }
+
+            if (insights.platformStrategy) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-share-alt"></i> Platform Strategy</h3>
+                `;
+
+                Object.entries(insights.platformStrategy).forEach(([platform, strategy]) => {
+                    html += `<p><strong>${platform}:</strong> ${strategy}</p>`;
+                });
+
+                html += '</div>';
+            }
+
+            crossoverContent.innerHTML = html;
+        }
+
+        // Fetch data from existing tools
+        async function fetchTrendsData() {
+            try {
+                const response = await fetch('/api/trends/trends?limit=10');
+                const data = await response.json();
+                return data.data || [];
+            } catch (error) {
+                console.error('Failed to fetch trends:', error);
+                return [];
+            }
+        }
+
+        async function fetchCreatorsData() {
+            try {
+                const response = await fetch('/api/creators/creators?limit=10');
+                const data = await response.json();
+                return data.data || data || [];
+            } catch (error) {
+                console.error('Failed to fetch creators:', error);
+                return [];
+            }
+        }
+
+        async function fetchCurrentCreatorData() {
+            // This would be enhanced to get the currently viewed creator
+            return await fetchCreatorsData();
+        }
+
+        // Update counters
+        async function updateCounts() {
+            try {
+                const [trendsResponse, creatorsResponse] = await Promise.all([
+                    fetch('/api/trends/stats'),
+                    fetch('/api/creators/creators?limit=1')
+                ]);
+
+                const trendsData = await trendsResponse.json();
+                const creatorsData = await creatorsResponse.json();
+
+                document.getElementById('trendsCount').textContent =
+                    trendsData.data?.totalTrends || 0;
+
+                document.getElementById('creatorsCount').textContent =
+                    creatorsData.length || creatorsData.data?.length || 0;
+
+            } catch (error) {
+                console.error('Failed to update counts:', error);
+            }
+        }
+
+        // Check connection status
+        async function checkConnectionStatus() {
+            const trendsStatus = document.getElementById('trendsStatus');
+            const creatorsStatus = document.getElementById('creatorsStatus');
+
+            try {
+                await fetch('/api/trends/stats');
+                trendsStatus.className = 'connection-dot';
+            } catch {
+                trendsStatus.className = 'connection-dot error';
+            }
+
+            try {
+                await fetch('/api/creators/creators?limit=1');
+                creatorsStatus.className = 'connection-dot';
+            } catch {
+                creatorsStatus.className = 'connection-dot error';
+            }
+        }
+
+        // Socket event listeners
+        socket.on('connect', () => {
+            console.log('Connected to unified dashboard');
+            socket.emit('subscribe-insights', { timestamp: Date.now() });
+        });
+
+        socket.on('insights-updated', (data) => {
+            console.log('Fresh insights available:', data);
+            if (crossoverPanel.classList.contains('open')) {
+                generateCrossoverInsights();
+            }
+        });
+
+        // Initialize dashboard
+        async function initializeDashboard() {
+            await updateCounts();
+            await checkConnectionStatus();
+
+            // Auto-refresh every 30 seconds
+            setInterval(updateCounts, 30000);
+            setInterval(checkConnectionStatus, 10000);
+        }
+
+        // Handle iframe load events
+        trendsFrame.addEventListener('load', () => {
+            console.log('Trends tool loaded');
+        });
+
+        creatorsFrame.addEventListener('load', () => {
+            console.log('Creators tool loaded');
+        });
+
+        // Start the dashboard
+        initializeDashboard();
+    </script>
+</body>
+</html>
