@@ -478,16 +478,31 @@
             }
         });
 
+        // Track selected items
+        let selectedTrend = null;
+        let selectedCreator = null;
+
         // Generate AI-powered crossover insights
-        async function generateCrossoverInsights() {
+        async function generateCrossoverInsights(specificItem = null) {
             try {
-                crossoverContent.innerHTML = '<div class="loading"><div class="spinner"></div>Generating AI insights...</div>';
+                // Show what we're analyzing
+                let loadingMessage = 'Generating AI insights...';
+                if (specificItem) {
+                    if (specificItem.type === 'trend') {
+                        loadingMessage = `Analyzing trend: ${specificItem.hashtag || 'Selected trend'}...`;
+                    } else if (specificItem.type === 'creator') {
+                        loadingMessage = `Analyzing creator: ${specificItem.name || 'Selected creator'}...`;
+                    }
+                }
+
+                crossoverContent.innerHTML = `<div class="loading"><div class="spinner"></div>${loadingMessage}</div>`;
 
                 let insights;
 
                 if (currentTab === 'trends') {
-                    // Get current trending data and suggest creators
-                    const trendsData = await fetchTrendsData();
+                    // Get data for trends analysis
+                    const trendsData = specificItem && specificItem.type === 'trend' ?
+                        [specificItem.data] : await fetchTrendsData();
                     const creatorsContext = await fetchCreatorsData();
 
                     insights = await fetch('/api/crossover/insights', {
@@ -496,14 +511,16 @@
                         body: JSON.stringify({
                             type: 'trend-to-creators',
                             data: trendsData,
-                            context: creatorsContext
+                            context: creatorsContext,
+                            specific: specificItem ? true : false
                         })
                     }).then(r => r.json());
 
-                    renderTrendToCreatorInsights(insights);
+                    renderTrendToCreatorInsights(insights, specificItem);
                 } else {
-                    // Get creator data and suggest trending topics
-                    const creatorsData = await fetchCurrentCreatorData();
+                    // Get data for creator analysis
+                    const creatorsData = specificItem && specificItem.type === 'creator' ?
+                        [specificItem.data] : await fetchCreatorsData();
                     const trendsContext = await fetchTrendsData();
 
                     insights = await fetch('/api/crossover/insights', {
@@ -512,11 +529,12 @@
                         body: JSON.stringify({
                             type: 'creator-to-trends',
                             data: creatorsData,
-                            context: trendsContext
+                            context: trendsContext,
+                            specific: specificItem ? true : false
                         })
                     }).then(r => r.json());
 
-                    renderCreatorToTrendInsights(insights);
+                    renderCreatorToTrendInsights(insights, specificItem);
                 }
 
             } catch (error) {
@@ -531,7 +549,7 @@
         }
 
         // Render trend-to-creator insights
-        function renderTrendToCreatorInsights(response) {
+        function renderTrendToCreatorInsights(response, specificItem = null) {
             if (!response.success && response.fallback) {
                 response.insights = response.fallback;
             }
@@ -556,9 +574,20 @@
                 }
             }
 
-            let html = `
+            // Add header showing what we're analyzing
+            let analysisHeader = '';
+            if (specificItem) {
+                analysisHeader = `
+                    <div class="insight-card" style="background: linear-gradient(135deg, #EB008B, #31BDBF); color: white;">
+                        <h3><i class="fas fa-hashtag"></i> Analyzing: ${specificItem.hashtag || 'Selected Trend'}</h3>
+                        <p>AI-powered creator recommendations for this specific trend</p>
+                    </div>
+                `;
+            }
+
+            let html = analysisHeader + `
                 <div class="insight-card">
-                    <h3><i class="fas fa-lightbulb"></i> Trend Analysis</h3>
+                    <h3><i class="fas fa-lightbulb"></i> ${specificItem ? 'Specific Trend Analysis' : 'General Trends Overview'}</h3>
                     <p>${insights.trendInsights || 'No insights available'}</p>
                 </div>
             `;
@@ -603,7 +632,7 @@
         }
 
         // Render creator-to-trend insights
-        function renderCreatorToTrendInsights(response) {
+        function renderCreatorToTrendInsights(response, specificItem = null) {
             if (!response.success && response.fallback) {
                 response.insights = response.fallback;
             }
@@ -628,9 +657,20 @@
                 }
             }
 
-            let html = `
+            // Add header showing what we're analyzing
+            let analysisHeader = '';
+            if (specificItem) {
+                analysisHeader = `
+                    <div class="insight-card" style="background: linear-gradient(135deg, #31BDBF, #F16524); color: white;">
+                        <h3><i class="fas fa-user"></i> Analyzing: ${specificItem.name || 'Selected Creator'}</h3>
+                        <p>AI-powered trend recommendations for this specific creator</p>
+                    </div>
+                `;
+            }
+
+            let html = analysisHeader + `
                 <div class="insight-card">
-                    <h3><i class="fas fa-user-cog"></i> Creator Strategy</h3>
+                    <h3><i class="fas fa-user-cog"></i> ${specificItem ? 'Personalized Creator Strategy' : 'General Creator Overview'}</h3>
                     <p>${insights.creatorInsights || 'No insights available'}</p>
                 </div>
             `;
@@ -766,14 +806,101 @@
             setInterval(checkConnectionStatus, 10000);
         }
 
+        // Listen for messages from iframes (for when we implement selection)
+        window.addEventListener('message', (event) => {
+            // Handle messages from iframes when items are selected
+            if (event.data.type === 'trend-selected') {
+                console.log('Trend selected:', event.data);
+                selectedTrend = event.data.data;
+                if (crossoverPanel.classList.contains('open')) {
+                    generateCrossoverInsights({
+                        type: 'trend',
+                        data: selectedTrend,
+                        hashtag: selectedTrend.hashtag
+                    });
+                }
+            } else if (event.data.type === 'creator-selected') {
+                console.log('Creator selected:', event.data);
+                selectedCreator = event.data.data;
+                if (crossoverPanel.classList.contains('open')) {
+                    generateCrossoverInsights({
+                        type: 'creator',
+                        data: selectedCreator,
+                        name: selectedCreator.full_name || selectedCreator.name
+                    });
+                }
+            }
+        });
+
         // Handle iframe load events
         trendsFrame.addEventListener('load', () => {
             console.log('Trends tool loaded');
+            // Inject selection script if we have permission
+            try {
+                const script = document.createElement('script');
+                script.textContent = `
+                    console.log('Injecting trend selection listener');
+                    document.addEventListener('click', function(e) {
+                        const trendCard = e.target.closest('.trend-card, .trend-item, [data-trend-id]');
+                        if (trendCard && window.parent !== window) {
+                            const trendData = {
+                                hashtag: trendCard.textContent.match(/#\\w+/)?.[0] ||
+                                        trendCard.querySelector('.hashtag, .trend-hashtag, h3')?.textContent || null,
+                                element: trendCard.outerHTML
+                            };
+                            window.parent.postMessage({
+                                type: 'trend-selected',
+                                data: trendData
+                            }, '*');
+                        }
+                    });
+                `;
+                trendsFrame.contentWindow.document.head.appendChild(script);
+            } catch (e) {
+                console.log('Cannot inject into trends iframe - CORS restriction');
+            }
         });
 
         creatorsFrame.addEventListener('load', () => {
             console.log('Creators tool loaded');
+            // Try to detect creator selection via URL changes
+            try {
+                const checkUrl = setInterval(() => {
+                    const url = creatorsFrame.contentWindow.location.href;
+                    if (url.includes('/creators/') && !url.endsWith('/creators')) {
+                        // Extract creator ID from URL
+                        const creatorId = url.split('/creators/')[1];
+                        if (creatorId && creatorId !== selectedCreator?.id) {
+                            console.log('Creator ID from URL:', creatorId);
+                            // Fetch creator data
+                            fetchCreatorById(creatorId);
+                        }
+                    }
+                }, 1000);
+            } catch (e) {
+                console.log('Cannot access creators iframe URL - CORS restriction');
+            }
         });
+
+        // Fetch specific creator data
+        async function fetchCreatorById(creatorId) {
+            try {
+                const response = await fetch(`/api/creators/creators/${creatorId}`);
+                const creator = await response.json();
+                if (creator) {
+                    selectedCreator = creator;
+                    if (crossoverPanel.classList.contains('open') && currentTab === 'creators') {
+                        generateCrossoverInsights({
+                            type: 'creator',
+                            data: creator,
+                            name: creator.full_name || creator.name
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch creator:', error);
+            }
+        }
 
         // Start the dashboard
         initializeDashboard();
