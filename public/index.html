@@ -536,7 +536,25 @@
                 response.insights = response.fallback;
             }
 
-            const insights = response.insights || {};
+            let insights = response.insights || {};
+
+            // If insights is a string (raw JSON), parse it
+            if (typeof insights === 'string') {
+                try {
+                    // Remove any markdown code blocks
+                    const cleanJson = insights.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                    insights = JSON.parse(cleanJson);
+                } catch (e) {
+                    console.error('Failed to parse insights:', e);
+                    // Fallback to displaying as text
+                    return crossoverContent.innerHTML = `
+                        <div class="insight-card">
+                            <h3><i class="fas fa-exclamation-triangle"></i> Raw Response</h3>
+                            <pre style="white-space: pre-wrap; font-size: 12px;">${insights}</pre>
+                        </div>
+                    `;
+                }
+            }
 
             let html = `
                 <div class="insight-card">
@@ -590,7 +608,25 @@
                 response.insights = response.fallback;
             }
 
-            const insights = response.insights || {};
+            let insights = response.insights || {};
+
+            // If insights is a string (raw JSON), parse it
+            if (typeof insights === 'string') {
+                try {
+                    // Remove any markdown code blocks
+                    const cleanJson = insights.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                    insights = JSON.parse(cleanJson);
+                } catch (e) {
+                    console.error('Failed to parse insights:', e);
+                    // Fallback to displaying as text
+                    return crossoverContent.innerHTML = `
+                        <div class="insight-card">
+                            <h3><i class="fas fa-exclamation-triangle"></i> Raw Response</h3>
+                            <pre style="white-space: pre-wrap; font-size: 12px;">${insights}</pre>
+                        </div>
+                    `;
+                }
+            }
 
             let html = `
                 <div class="insight-card">

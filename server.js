@@ -206,12 +206,17 @@ Format as JSON with this structure:
     model: "gpt-4-turbo-preview",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
-    max_tokens: 1500
+    max_tokens: 1500,
+    response_format: { type: "json_object" }
   });
 
   try {
-    return JSON.parse(completion.choices[0].message.content);
+    // Clean up any markdown code blocks if present
+    const content = completion.choices[0].message.content;
+    const cleanContent = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    return JSON.parse(cleanContent);
   } catch (parseError) {
+    console.error('Failed to parse AI response:', parseError);
     return {
       recommendedCreators: [],
       trendInsights: completion.choices[0].message.content,
@@ -265,12 +270,17 @@ Format as JSON with this structure:
     model: "gpt-4-turbo-preview",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
-    max_tokens: 1500
+    max_tokens: 1500,
+    response_format: { type: "json_object" }
   });
 
   try {
-    return JSON.parse(completion.choices[0].message.content);
+    // Clean up any markdown code blocks if present
+    const content = completion.choices[0].message.content;
+    const cleanContent = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    return JSON.parse(cleanContent);
   } catch (parseError) {
+    console.error('Failed to parse AI response:', parseError);
     return {
       recommendedTrends: [],
       creatorInsights: completion.choices[0].message.content,
