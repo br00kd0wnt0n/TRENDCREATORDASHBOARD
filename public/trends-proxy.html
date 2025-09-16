@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ralph Loves Trends</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #EB008B;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .trends-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .trend-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            border-left: 4px solid #EB008B;
+        }
+        .trend-card:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .trend-hashtag {
+            font-size: 18px;
+            font-weight: 600;
+            color: #EB008B;
+            margin-bottom: 8px;
+        }
+        .trend-platform {
+            display: inline-block;
+            background: #31BDBF;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        .trend-insights {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 8px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .refresh-btn {
+            background: linear-gradient(45deg, #EB008B, #31BDBF);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .refresh-btn:hover {
+            transform: scale(1.05);
+        }
+        .error {
+            background: #ff4757;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">🔥 Ralph Loves Trends</h1>
+            <button class="refresh-btn" onclick="loadTrends()">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalTrends">-</div>
+                <div class="stat-label">Total Trends</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="recentTrends">-</div>
+                <div class="stat-label">Recent (24h)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="platforms">-</div>
+                <div class="stat-label">Platforms</div>
+            </div>
+        </div>
+
+        <div id="content">
+            <div class="loading">Loading trends...</div>
+        </div>
+    </div>
+
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+    <script>
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/trends/stats');
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    document.getElementById('totalTrends').textContent = data.data.totalTrends || 0;
+                    document.getElementById('recentTrends').textContent = data.data.recentTrends || 0;
+                    document.getElementById('platforms').textContent =
+                        data.data.platformStats ? data.data.platformStats.length : 0;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadTrends() {
+            const contentDiv = document.getElementById('content');
+            contentDiv.innerHTML = '<div class="loading">Loading trends...</div>';
+
+            try {
+                const response = await fetch('/api/trends/trends?limit=20');
+                const data = await response.json();
+
+                if (data.success && data.data && data.data.length > 0) {
+                    const trendsHtml = data.data.map(trend => `
+                        <div class="trend-card">
+                            ${trend.hashtag ? `<div class="trend-hashtag">${trend.hashtag}</div>` : ''}
+                            ${trend.platform ? `<span class="trend-platform">${trend.platform}</span>` : ''}
+                            ${trend.category ? `<span class="trend-platform" style="background: #F16524">${trend.category}</span>` : ''}
+                            ${trend.aiInsights ? `<div class="trend-insights">${trend.aiInsights}</div>` : ''}
+                            ${trend.confidence ? `
+                                <div style="margin-top: 8px;">
+                                    <small style="color: #999">Confidence: ${Math.round(trend.confidence * 100)}%</small>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('');
+
+                    contentDiv.innerHTML = `<div class="trends-grid">${trendsHtml}</div>`;
+                } else {
+                    contentDiv.innerHTML = '<div class="error">No trends available. Try refreshing or check back later.</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load trends:', error);
+                contentDiv.innerHTML = '<div class="error">Failed to load trends. Please try again.</div>';
+            }
+
+            // Also refresh stats
+            loadStats();
+        }
+
+        // Load on page ready
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStats();
+            loadTrends();
+
+            // Auto-refresh every 30 seconds
+            setInterval(() => {
+                loadStats();
+            }, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -78,13 +78,28 @@ app.get('/health', (req, res) => {
 // Proxy endpoints to maintain CORS compatibility
 app.get('/api/trends/*', async (req, res) => {
   try {
-    const response = await axios.get(`${TRENDS_API_URL}${req.path.replace('/api/trends', '')}`, {
-      params: req.query
+    const path = req.path.replace('/api/trends', '');
+    const apiUrl = `${TRENDS_API_URL}${path}`;
+    console.log('Proxying to Trends API:', apiUrl);
+
+    const response = await axios.get(apiUrl, {
+      params: req.query,
+      timeout: 10000
     });
     res.json(response.data);
   } catch (error) {
     console.error('Trends API proxy error:', error.message);
-    res.status(500).json({ error: 'Failed to fetch trends data' });
+    if (error.response) {
+      res.status(error.response.status).json({
+        error: 'Failed to fetch trends data',
+        details: error.response.data
+      });
+    } else {
+      res.status(500).json({
+        error: 'Failed to fetch trends data',
+        message: error.message
+      });
+    }
   }
 });
 
