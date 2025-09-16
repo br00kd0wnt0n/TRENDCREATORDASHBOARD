@@ -431,8 +431,10 @@
         // Determine environment and set iframe URLs
         const isProduction = window.location.hostname !== 'localhost';
 
-        // Use proxy page for Trends due to X-Frame-Options restriction
-        const trendsUrl = '/trends-proxy.html';
+        // Both tools can now be embedded in iframes
+        const trendsUrl = isProduction ?
+            'https://ralphlovestrends-production.up.railway.app' :
+            'http://localhost:30003';
         const creatorsUrl = isProduction ?
             'https://ralphodex.up.railway.app' :
             'http://localhost:3000';
@@ -440,11 +442,6 @@
         // Set iframe sources
         trendsFrame.src = trendsUrl;
         creatorsFrame.src = creatorsUrl;
-
-        // Check if trends iframe is blocked and handle fallback
-        trendsFrame.onerror = function() {
-            console.log('Trends iframe blocked, using proxy view');
-        };
 
         // State management
         let currentTab = 'trends';
