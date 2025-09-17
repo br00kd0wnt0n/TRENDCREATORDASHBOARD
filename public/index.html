@@ -1718,30 +1718,6 @@
             }
         }
 
-        // Create better notification system
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
-                color: white;
-                border-radius: 4px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                z-index: 1000;
-                font-weight: 500;
-                max-width: 300px;
-            `;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                notification.remove();
-            }, 4000);
-        }
-
         async function clearDebugData() {
             if (!confirm('Are you sure you want to clear all trends from the database? This cannot be undone.')) {
                 return;
@@ -1752,16 +1728,15 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    showNotification(data.message, 'success');
+                    alert(data.message);
                     loadStats();
                     loadTrends();
-                    loadNarrative(); // Also reload narrative to update Top 10
                 } else {
-                    showNotification('Failed to clear database: ' + (data.error || 'Unknown error'), 'error');
+                    alert('Failed to clear database: ' + (data.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Clear database failed:', error);
-                showNotification('Failed to clear database: ' + error.message, 'error');
+                alert('Failed to clear database: ' + error.message);
             }
         }
 
