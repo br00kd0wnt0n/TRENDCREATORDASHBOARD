@@ -19,6 +19,8 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3002;
 const TRENDS_API_URL = process.env.TRENDS_API_URL || 'http://localhost:30003/api';
+
+// In production, should be: https://ralphlovestrends-production.up.railway.app/api
 const CREATORS_API_URL = process.env.CREATORS_API_URL || 'http://localhost:3001/api';
 
 // Initialize OpenAI
@@ -97,6 +99,34 @@ app.get('/api/trends/*', async (req, res) => {
     } else {
       res.status(500).json({
         error: 'Failed to fetch trends data',
+        message: error.message
+      });
+    }
+  }
+});
+
+// Add POST proxy for AI Intel trigger endpoint
+app.post('/api/trends/*', async (req, res) => {
+  try {
+    const path = req.path.replace('/api/trends', '');
+    const apiUrl = `${TRENDS_API_URL}${path}`;
+    console.log('Proxying POST to Trends API:', apiUrl);
+
+    const response = await axios.post(apiUrl, req.body, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Trends API POST proxy error:', error.message);
+    if (error.response) {
+      res.status(error.response.status).json({
+        error: 'Failed to call trends API',
+        details: error.response.data
+      });
+    } else {
+      res.status(500).json({
+        error: 'Failed to call trends API',
         message: error.message
       });
     }
