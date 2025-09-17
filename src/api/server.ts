@@ -635,7 +635,7 @@ app.get('/api/intel/briefing', async (_req, res) => {
 });
 
 // Get Strategic Insights and Top 10 trends in crossover-ready format
-app.get('/api/trends/strategic-insights', async (_req, res) => {
+app.get('/api/strategic-insights', async (_req, res) => {
   try {
     const briefing = await generateIntelBriefing();
 
