@@ -60,13 +60,13 @@ app.get('/healthz', (_req, res) => {
 // API Routes
 app.get('/api/trends', async (_req, res) => {
   try {
-    const { 
-      platform, 
-      category, 
-      limit = 50, 
+    const {
+      platform,
+      category,
+      limit = 100, // Increased default limit
       offset = 0,
       sentiment,
-      since 
+      since
     } = _req.query;
 
     const whereClause: any = {};
@@ -83,7 +83,7 @@ app.get('/api/trends', async (_req, res) => {
     const trends = await Trend.findAndCountAll({
       where: whereClause,
       order: [['scrapedAt', 'DESC']],
-      limit: Math.min(parseInt(limit as string), 100),
+      limit: Math.min(parseInt(limit as string), 200), // Allow up to 200 trends
       offset: parseInt(offset as string),
       raw: true
     });
