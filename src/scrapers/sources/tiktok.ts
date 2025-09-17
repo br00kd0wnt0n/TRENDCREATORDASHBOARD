@@ -11,86 +11,94 @@ export const TikTokSource: TrendSource = {
     window: 3600000
   },
   selectors: {
-    waitFor: '.trending-card, .trend-card, [data-e2e*="trend"], [class*="trending"], [class*="hashtag"], .card',
-    trends: '.trending-card, .trend-card, [data-e2e*="trend"], [class*="trending"], [class*="hashtag"], .card, [class*="item"]',
-    hashtag: '.title, .name, .text, h1, h2, h3, h4, h5, strong, [class*="title"], [class*="name"], [class*="text"]',
-    popularity: '.count, .number, .views, .metric, [class*="count"], [class*="number"], [class*="views"], [class*="metric"]',
-    category: '.category, .tag, .label, .type, [class*="category"], [class*="tag"], [class*="label"], [class*="type"]'
+    waitFor: '[class*="CommonDataList"], [class*="cardWrapper"], [class*="listWrap"]',
+    trends: '[class*="cardWrapper"], [class*="row-item"], [class*="trend-item"]',
+    hashtag: 'a[href*="/hashtag/"], a[href*="hashtag"], [class*="hashtag"] a',
+    popularity: '[class*="posts"], [class*="count"], [class*="metric"]',
+    category: '[class*="category"], [class*="tag"], [class*="badge"]'
   },
   extractionLogic: async (page: Page): Promise<TrendData[]> => {
     try {
       console.log('🎯 TIKTOK: Starting extraction logic');
-      console.log('🔍 TIKTOK: Waiting for selector:', TikTokSource.selectors!.waitFor!);
-      
-      await page.waitForSelector(TikTokSource.selectors!.waitFor!, { 
+      console.log('🔍 TIKTOK: Waiting for content to load...');
+
+      // Wait for the data list container
+      await page.waitForSelector('[class*="CommonDataList"], [class*="cardWrapper"]', {
         timeout: 30000,
-        visible: true 
+        visible: true
       });
-      
-      console.log('✅ TIKTOK: Selector found, proceeding with extraction');
 
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight / 2);
-      });
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('✅ TIKTOK: Content found, proceeding with extraction');
 
-      const trends = await page.evaluate((selectors: any) => {
+      // Give the page a moment to fully load
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const trends = await page.evaluate(() => {
         const items: TrendData[] = [];
         console.log('🔍 TIKTOK: Starting page evaluation');
-        
-        // Strategy 1: Try specific selectors
-        let trendElements = document.querySelectorAll(selectors.trends!);
-        console.log(`📋 TIKTOK: Found ${trendElements.length} elements with specific selectors`);
-        
-        // Strategy 2: If no elements found, try broader approach
-        if (trendElements.length === 0) {
-          console.log('🔄 TIKTOK: Trying broader selectors');
-          trendElements = document.querySelectorAll('div, section, article, li');
-          console.log(`📋 TIKTOK: Found ${trendElements.length} elements with broad selectors`);
-        }
-        
-        let processedCount = 0;
-        trendElements.forEach((element: any, _index) => {
-          if (processedCount >= 50) return; // Limit processing for performance
-          
-          try {
-            // Multiple strategies for finding hashtag text
-            let hashtag = '';
-            
-            // Strategy 1: Look for hashtag in specific elements
-            const titleEl = element.querySelector(selectors.hashtag);
-            if (titleEl) {
-              hashtag = titleEl.textContent?.trim() || '';
-            }
-            
-            // Strategy 2: Look for hashtags in any text content
-            if (!hashtag) {
-              const textContent = element.textContent || '';
-              const hashtagMatch = textContent.match(/#[\w\u4e00-\u9fff]+/);
-              hashtag = hashtagMatch ? hashtagMatch[0] : '';
-            }
-            
-            // Strategy 3: Look for trending words (non-hashtag)
-            if (!hashtag && element.textContent && element.textContent.length > 2 && element.textContent.length < 50) {
-              const text = element.textContent.trim();
-              // Skip common UI text
-              if (!text.match(/^(Home|For You|Following|Live|Profile|Search|Trending|Popular)$/i) && 
-                  !text.match(/^[\d\s\w]{1,3}$/)) {
-                hashtag = text;
-              }
-            }
-            
-            if (hashtag && hashtag.length > 1) {
-              const popularity = element.querySelector(selectors.popularity)?.textContent?.trim() || 
-                               element.textContent?.match(/[\d.]+[MKB]?\s*(views?|likes?)/i)?.[0] || '';
-              
-              const category = element.querySelector(selectors.category)?.textContent?.trim() || 
-                             element.getAttribute('data-category') || 'General';
 
-              console.log(`📝 TIKTOK: Found potential trend: "${hashtag}"`);
+        // Look for card wrappers that contain trend data
+        const trendCards = document.querySelectorAll('[class*="cardWrapper"], [class*="row-item"]');
+        console.log(`📋 TIKTOK: Found ${trendCards.length} potential trend cards`);
+
+        trendCards.forEach((card: any) => {
+          try {
+            const cardText = card.textContent || '';
+
+            // Skip header cards
+            if (cardText.includes('RankHashtags') || cardText.includes('Actions')) {
+              return;
+            }
+
+            // Extract hashtag more carefully
+            // Pattern: number followed by # then the hashtag word
+            let hashtag = '';
+            const rankHashtagMatch = cardText.match(/\d+#\s*([a-zA-Z0-9]+)/);
+            if (rankHashtagMatch) {
+              hashtag = rankHashtagMatch[1];
+            } else {
+              // Try alternative pattern: just # followed by word
+              const altMatch = cardText.match(/#\s*([a-zA-Z0-9]+)/);
+              if (!altMatch) return;
+              hashtag = altMatch[1];
+            }
+
+            // Extract posts count - look for number followed by K/M/B
+            const postsMatch = cardText.match(/(\d+\.?\d*[KMB]?)\s*Posts?/i);
+            const postsCount = postsMatch ? postsMatch[1] : 'N/A';
+
+            // Extract category - look for category keywords
+            let category = 'General';
+            if (cardText.includes('Sports') || cardText.includes('Outdoor')) {
+              category = 'Sports & Outdoor';
+            } else if (cardText.includes('Entertainment')) {
+              category = 'Entertainment';
+            } else if (cardText.includes('Fashion')) {
+              category = 'Fashion';
+            } else if (cardText.includes('Food')) {
+              category = 'Food & Beverage';
+            } else if (cardText.includes('Beauty')) {
+              category = 'Beauty & Personal Care';
+            } else if (cardText.includes('Technology') || cardText.includes('Tech')) {
+              category = 'Technology';
+            } else if (cardText.includes('Business')) {
+              category = 'Business';
+            } else if (cardText.includes('Featured')) {
+              category = 'Featured';
+            } else if (cardText.includes('Education')) {
+              category = 'Education';
+            } else if (cardText.includes('Gaming')) {
+              category = 'Gaming';
+            }
+
+            // Check if it's marked as NEW
+            const isNew = cardText.includes('NEW');
+
+            if (hashtag && hashtag.length > 1) {
+              console.log(`📝 TIKTOK: Found trend: "#${hashtag}" with ${postsCount} posts in ${category}`);
               items.push({
-                hashtag: hashtag.startsWith('#') ? hashtag : `#${hashtag}`,
-                popularity: popularity || 'N/A',
+                hashtag: `#${hashtag}`,
+                popularity: postsCount,
                 category: category,
                 platform: 'TikTok',
                 region: 'Global',
@@ -98,19 +106,49 @@ export const TikTokSource: TrendSource = {
                 metadata: {
                   source_url: window.location.href,
                   scraped_from: 'TikTok Creative Center',
-                  extraction_method: hashtag.startsWith('#') ? 'hashtag' : 'text_content'
+                  extraction_method: 'card_based',
+                  is_new: isNew
                 }
               });
-              processedCount++;
             }
           } catch (err) {
-            console.error('Error extracting trend item:', err);
+            console.error('Error extracting trend from card:', err);
           }
         });
 
-        console.log(`📊 TIKTOK: Extracted ${items.length} trends from page evaluation`);
+        // If no cards found, try a more aggressive approach
+        if (items.length === 0) {
+          console.log('🔄 TIKTOK: No cards found, trying text-based extraction...');
+
+          const pageText = document.body.textContent || '';
+          // Look for patterns like "1# gameday" or "2# fnl"
+          const trendMatches = pageText.matchAll(/\d+#\s*([a-zA-Z0-9]+).*?(\d+\.?\d*[KMB]?)\s*Posts?/gi);
+
+          for (const match of trendMatches) {
+            const hashtag = match[1];
+            const posts = match[2];
+
+            if (hashtag && hashtag.length > 1) {
+              items.push({
+                hashtag: `#${hashtag}`,
+                popularity: posts || 'Trending',
+                category: 'General',
+                platform: 'TikTok',
+                region: 'Global',
+                timestamp: new Date(),
+                metadata: {
+                  source_url: window.location.href,
+                  scraped_from: 'TikTok Creative Center',
+                  extraction_method: 'text_pattern'
+                }
+              });
+            }
+          }
+        }
+
+        console.log(`📊 TIKTOK: Extracted ${items.length} trends`);
         return items;
-      }, TikTokSource.selectors);
+      });
 
       console.log(`📊 TIKTOK: Extracted ${trends.length} TikTok trends`);
       logger.info(`Extracted ${trends.length} TikTok trends`);
