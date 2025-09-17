@@ -561,6 +561,267 @@ app.get('/api/trending/top', async (_req, res) => {
   }
 });
 
+// AI Intel Briefing Endpoints for Unified Dashboard Integration
+// These endpoints allow the unified dashboard to properly wait for and retrieve AI insights
+
+// Check if AI Intel briefing is ready/loading
+app.get('/api/intel/status', async (_req, res) => {
+  try {
+    // Check if we have recent trends and AI analysis
+    const recentTrends = await Trend.count({
+      where: {
+        scrapedAt: {
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+
+    const trendsWithAI = await Trend.count({
+      where: {
+        scrapedAt: {
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        },
+        aiInsights: {
+          [Op.ne]: ''
+        }
+      }
+    });
+
+    const isReady = recentTrends > 0 && trendsWithAI > 0;
+    const lastUpdate = await Trend.findOne({
+      order: [['scrapedAt', 'DESC']],
+      attributes: ['scrapedAt'],
+      raw: true
+    });
+
+    res.json({
+      success: true,
+      data: {
+        isReady,
+        isLoading: false, // We'll implement real-time loading status later
+        recentTrends,
+        trendsWithAI,
+        aiCoverage: recentTrends > 0 ? (trendsWithAI / recentTrends) : 0,
+        lastUpdate: lastUpdate?.scrapedAt,
+        status: isReady ? 'ready' : 'insufficient_data'
+      }
+    });
+  } catch (error) {
+    logger.error('Failed to check intel status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check intel status'
+    });
+  }
+});
+
+// Get AI Intel briefing (Strategic Insights + Top 10 trends)
+app.get('/api/intel/briefing', async (_req, res) => {
+  try {
+    // This is similar to narrative but formatted specifically for crossover analysis
+    const briefingData = await generateIntelBriefing();
+
+    res.json({
+      success: true,
+      data: briefingData
+    });
+  } catch (error) {
+    logger.error('Failed to generate intel briefing:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate intel briefing'
+    });
+  }
+});
+
+// Get Strategic Insights and Top 10 trends in crossover-ready format
+app.get('/api/trends/strategic-insights', async (_req, res) => {
+  try {
+    const briefing = await generateIntelBriefing();
+
+    // Format specifically for crossover analysis
+    const strategicData = {
+      strategicInsights: briefing.narrative,
+      topTrends: briefing.topTrends,
+      marketContext: briefing.marketContext,
+      generatedAt: new Date().toISOString(),
+      confidence: briefing.confidence,
+      analysisDepth: 'comprehensive'
+    };
+
+    res.json({
+      success: true,
+      data: strategicData
+    });
+  } catch (error) {
+    logger.error('Failed to get strategic insights:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get strategic insights'
+    });
+  }
+});
+
+// Trigger AI analysis if needed (for manual refresh)
+app.post('/api/intel/trigger', async (_req, res) => {
+  try {
+    // Get recent trends that might need AI analysis
+    const allRecentTrends = await Trend.findAll({
+      where: {
+        scrapedAt: {
+          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+        }
+      },
+      limit: 20,
+      order: [['scrapedAt', 'DESC']]
+    });
+
+    // Filter for trends that need AI analysis
+    const trendsNeedingAI = allRecentTrends.filter(t =>
+      !t.aiInsights || t.aiInsights.trim() === ''
+    );
+
+    if (trendsNeedingAI.length > 0) {
+      // Trigger AI analysis for these trends
+      const analyses = await aiService.analyzeTrends(trendsNeedingAI.map(t => ({
+        hashtag: t.hashtag,
+        platform: t.platform,
+        category: t.category,
+        content: (t as any).content || '',
+        metadata: t.metadata as any
+      })));
+
+      // Update trends with AI insights
+      for (const trend of trendsNeedingAI) {
+        const key = `${trend.hashtag}_${trend.platform}`;
+        const analysis = analyses.get(key);
+        if (analysis) {
+          await trend.update({
+            aiInsights: analysis.insights,
+            sentiment: analysis.sentiment,
+            confidence: analysis.confidence
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          message: 'AI analysis triggered',
+          trendsAnalyzed: trendsNeedingAI.length,
+          status: 'processing'
+        }
+      });
+    } else {
+      res.json({
+        success: true,
+        data: {
+          message: 'No trends need AI analysis',
+          status: 'up_to_date'
+        }
+      });
+    }
+  } catch (error) {
+    logger.error('Failed to trigger AI analysis:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to trigger AI analysis'
+    });
+  }
+});
+
+// Helper function to generate comprehensive intel briefing
+async function generateIntelBriefing() {
+  // Get top trends with platform diversity
+  const tiktokTrends = await Trend.findAll({
+    where: {
+      platform: 'TikTok',
+      confidence: { [Op.gte]: 0.1 }
+    },
+    order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+    limit: 5,
+    raw: true
+  });
+
+  const twitterTrends = await Trend.findAll({
+    where: {
+      platform: 'X (Twitter)',
+      confidence: { [Op.gte]: 0.1 }
+    },
+    order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+    limit: 5,
+    raw: true
+  });
+
+  // Combine for top 10 with diversity
+  const topTrends = [...tiktokTrends, ...twitterTrends]
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+    .slice(0, 10);
+
+  // Get comprehensive stats for AI analysis
+  const recentTrends = await Trend.findAll({
+    where: {
+      scrapedAt: {
+        [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+      }
+    },
+    order: [['scrapedAt', 'DESC']],
+    limit: 30,
+    raw: true
+  });
+
+  const platformStats = await Trend.findAll({
+    attributes: [
+      'platform',
+      [Trend.sequelize!.fn('COUNT', '*'), 'count']
+    ],
+    group: 'platform',
+    raw: true
+  });
+
+  const statsForAI = {
+    topTrends: topTrends.map(t => ({
+      hashtag: t.hashtag,
+      platform: t.platform,
+      sentiment: t.sentiment,
+      confidence: t.confidence,
+      aiInsights: t.aiInsights,
+      category: t.category
+    })),
+    recentTrends: recentTrends.map(t => ({
+      hashtag: t.hashtag,
+      platform: t.platform,
+      category: t.category,
+      confidence: t.confidence,
+      aiInsights: t.aiInsights
+    })),
+    platformStats
+  };
+
+  // Generate AI narrative focused on strategic insights
+  const narrative = await aiService.generateDashboardNarrative(statsForAI);
+
+  return {
+    narrative,
+    topTrends: topTrends.map(t => ({
+      hashtag: t.hashtag,
+      platform: t.platform,
+      category: t.category || 'General',
+      confidence: t.confidence,
+      sentiment: t.sentiment || 'neutral',
+      aiInsights: t.aiInsights,
+      scrapedAt: t.scrapedAt
+    })),
+    marketContext: {
+      totalActiveTrends: recentTrends.length,
+      platformDistribution: platformStats,
+      averageConfidence: topTrends.reduce((acc, t) => acc + (t.confidence || 0), 0) / topTrends.length,
+      lastUpdated: new Date().toISOString()
+    },
+    confidence: topTrends.length >= 5 ? 'high' : topTrends.length >= 2 ? 'medium' : 'low'
+  };
+}
+
 // Serve dashboard HTML
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../public/index.html'));
