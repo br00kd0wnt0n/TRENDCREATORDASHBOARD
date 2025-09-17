@@ -775,6 +775,53 @@
             font-size: 0.8em;
             font-weight: 500;
         }
+
+        /* Tooltip styles */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 320px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 8px;
+            padding: 12px;
+            position: absolute;
+            z-index: 1000;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -160px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+            line-height: 1.4;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .tooltip .tooltiptext strong {
+            color: #F16524;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -837,10 +884,17 @@
                 <div class="stat-number" id="recentTrends">-</div>
                 <div class="stat-label">Recent (24h)</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card tooltip">
                 <div class="stat-icon"><i class="fas fa-fire"></i></div>
                 <div class="stat-number" id="hotTrends">-</div>
                 <div class="stat-label">High Confidence</div>
+                <span class="tooltiptext">
+                    <strong>High Confidence Trends (70%+)</strong><br><br>
+                    • Most reliable opportunities for immediate action<br>
+                    • Strong cross-platform presence & clear market signals<br>
+                    • Validated cultural relevance<br><br>
+                    <strong>Business Value:</strong> Prioritize for content creation, marketing campaigns, or product development
+                </span>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-brain"></i></div>
