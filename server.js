@@ -119,13 +119,14 @@ app.get('/api/creators/*', async (req, res) => {
 // AI-powered crossover insights endpoint
 app.post('/api/crossover/insights', async (req, res) => {
   try {
-    const { type, data, context, specific, tabContext } = req.body;
+    const { type, data, context, specific, tabContext, strategicInsights, marketContext, usingAIIntel } = req.body;
 
     console.log(`Generating ${type} insights:`, {
       dataCount: data?.length || 0,
       contextCount: context?.length || 0,
       specific,
-      tabContext
+      tabContext,
+      usingAIIntel: !!usingAIIntel
     });
 
     if (!process.env.OPENAI_API_KEY) {
@@ -152,7 +153,7 @@ app.post('/api/crossover/insights', async (req, res) => {
     let insights;
 
     if (type === 'trend-to-creators') {
-      insights = await generateTrendToCreatorInsights(data, context, specific, tabContext);
+      insights = await generateTrendToCreatorInsights(data, context, specific, tabContext, strategicInsights, marketContext);
     } else if (type === 'creator-to-trends') {
       insights = await generateCreatorToTrendInsights(data, context, specific, tabContext);
     } else {
@@ -177,25 +178,35 @@ app.post('/api/crossover/insights', async (req, res) => {
 });
 
 // Generate trend-to-creator insights using OpenAI
-async function generateTrendToCreatorInsights(trendData, creatorsContext, specific = false, tabContext = '') {
+async function generateTrendToCreatorInsights(trendData, creatorsContext, specific = false, tabContext = '', strategicInsights = null, marketContext = null) {
   const isSpecificTrend = specific && trendData.length === 1;
   const trendCount = trendData.length;
+  const usingAIIntel = !!strategicInsights;
 
   const prompt = `
 As an expert in social media marketing and creator partnerships, analyze ${isSpecificTrend ? 'this specific trend' : `these ${trendCount} trending topics`} and suggest relevant creators for brand partnerships.
 
-${isSpecificTrend ? 'SPECIFIC TREND BEING ANALYZED:' : `TOP ${trendCount} TRENDING DATA:`}
+${usingAIIntel ? 'STRATEGIC INSIGHTS FROM TREND ANALYSIS AI INTEL BRIEFING:' : ''}
+${usingAIIntel ? JSON.stringify(strategicInsights, null, 2) : ''}
+
+${usingAIIntel ? 'MARKET CONTEXT:' : ''}
+${usingAIIntel ? JSON.stringify(marketContext, null, 2) : ''}
+
+${isSpecificTrend ? 'SPECIFIC TREND BEING ANALYZED:' : `TOP ${trendCount} AI-ANALYZED TRENDING DATA:`}
 ${JSON.stringify(trendData, null, 2)}
 
 AVAILABLE CREATORS CONTEXT:
 ${JSON.stringify(creatorsContext.slice(0, 15), null, 2)}
 
-Please provide:
-1. Top 3-5 creators who would be best suited for this trend
-2. Specific collaboration ideas for each creator
-3. Expected engagement potential (High/Medium/Low)
-4. Why each creator matches this trend
-5. Suggested content formats (videos, posts, stories, etc.)
+${usingAIIntel ? `
+IMPORTANT: Use the Strategic Insights from the AI Intel briefing above to inform your analysis. Reference the key insights, market intelligence, and strategic recommendations when matching creators to trends.
+
+Cross-reference the Strategic Insights with the CREATOR database to provide:` : 'Please provide:'}
+1. Top 3-5 creators who would be best suited for ${usingAIIntel ? 'these AI-analyzed trends and Strategic Insights' : 'this trend'}
+2. Specific collaboration ideas for each creator ${usingAIIntel ? 'based on the Strategic Insights' : ''}
+3. Expected engagement potential (High/Medium/Low) ${usingAIIntel ? 'considering the market context' : ''}
+4. Why each creator matches ${usingAIIntel ? 'the Strategic Insights and trending patterns' : 'this trend'}
+5. Suggested content formats (videos, posts, stories, etc.) ${usingAIIntel ? 'that align with the Strategic Insights' : ''}
 
 Format as JSON with this structure:
 {

@@ -550,26 +550,50 @@
                 let insights;
 
                 if (currentTab === 'trends') {
-                    // Get TRENDS data when on trends tab
-                    const trendsData = specificItem && specificItem.type === 'trend' ?
-                        [specificItem.data] : await fetchCurrentTrendData();
+                    // First check if AI Intel briefing is ready
+                    crossoverContent.innerHTML = `<div class="loading"><div class="spinner"></div>Checking AI Intel briefing status...</div>`;
+
+                    const intelStatus = await checkAIIntelStatus();
+
+                    if (!intelStatus.isReady) {
+                        crossoverContent.innerHTML = `
+                            <div class="insight-card">
+                                <h3><i class="fas fa-clock"></i> AI Intel Briefing Loading</h3>
+                                <p>Waiting for Trend Analysis AI Intel briefing to complete...</p>
+                                <p>Status: ${intelStatus.status}</p>
+                                <p>AI Coverage: ${Math.round(intelStatus.aiCoverage * 100)}%</p>
+                                <button onclick="triggerAIAnalysis()" style="margin-top: 10px; padding: 8px 16px; background: #EB008B; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    Trigger AI Analysis
+                                </button>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    // Get Strategic Insights from Trend Analysis AI Intel briefing
+                    crossoverContent.innerHTML = `<div class="loading"><div class="spinner"></div>Retrieving Strategic Insights from AI Intel briefing...</div>`;
+
+                    const strategicInsights = await fetchStrategicInsights();
                     const creatorsContext = await fetchCreatorsData();
 
-                    console.log('Generating trend-to-creator insights with:', trendsData.length, 'trends');
+                    console.log('Generating trend-to-creator insights with Strategic Insights:', strategicInsights);
 
                     insights = await fetch('/api/crossover/insights', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             type: 'trend-to-creators',
-                            data: trendsData,
+                            data: strategicInsights.topTrends, // Use AI-analyzed top trends
                             context: creatorsContext,
+                            strategicInsights: strategicInsights.strategicInsights, // Include AI narrative
+                            marketContext: strategicInsights.marketContext,
                             specific: specificItem ? true : false,
-                            tabContext: 'trends'
+                            tabContext: 'trends',
+                            usingAIIntel: true // Flag to indicate we're using Strategic Insights
                         })
                     }).then(r => r.json());
 
-                    renderTrendToCreatorInsights(insights, specificItem);
+                    renderTrendToCreatorInsights(insights, specificItem, strategicInsights);
                 } else if (currentTab === 'creators') {
                     // Get CREATOR data when on creators tab
                     const creatorsData = specificItem && specificItem.type === 'creator' ?
@@ -605,7 +629,7 @@
         }
 
         // Render trend-to-creator insights
-        function renderTrendToCreatorInsights(response, specificItem = null) {
+        function renderTrendToCreatorInsights(response, specificItem = null, strategicInsights = null) {
             if (!response.success && response.fallback) {
                 response.insights = response.fallback;
             }
@@ -639,11 +663,40 @@
                         <p>AI-powered creator recommendations for this specific trend</p>
                     </div>
                 `;
+            } else if (strategicInsights) {
+                analysisHeader = `
+                    <div class="insight-card" style="background: linear-gradient(135deg, #31BDBF, #EB008B); color: white;">
+                        <h3><i class="fas fa-brain"></i> Using AI Intel Briefing</h3>
+                        <p>Cross-referencing Strategic Insights from Trend Analysis with CREATOR database</p>
+                        <small>Last updated: ${new Date(strategicInsights.marketContext?.lastUpdated || Date.now()).toLocaleTimeString()}</small>
+                    </div>
+                `;
             }
 
-            let html = analysisHeader + `
+            let html = analysisHeader;
+
+            // Show Strategic Insights if available (from AI Intel briefing)
+            if (strategicInsights && strategicInsights.strategicInsights) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-chart-line"></i> Strategic Insights from Trend Analysis</h3>
+                        <p><strong>Overview:</strong> ${strategicInsights.strategicInsights.overview || 'AI analysis complete'}</p>
+                        ${strategicInsights.strategicInsights.keyInsights ? `
+                            <h4>Key Market Intelligence:</h4>
+                            <ul>
+                                ${strategicInsights.strategicInsights.keyInsights.slice(0, 3).map(insight =>
+                                    `<li>${insight}</li>`
+                                ).join('')}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            // Main insights
+            html += `
                 <div class="insight-card">
-                    <h3><i class="fas fa-lightbulb"></i> ${specificItem ? 'Specific Trend Analysis' : 'General Trends Overview'}</h3>
+                    <h3><i class="fas fa-lightbulb"></i> ${specificItem ? 'Specific Trend Analysis' : 'Crossover Analysis'}</h3>
                     <p>${insights.trendInsights || 'No insights available'}</p>
                 </div>
             `;
@@ -849,6 +902,70 @@
                 return [selectedTrend];
             }
             return await fetchTrendsData();
+        }
+
+        // Check AI Intel briefing status from Trend Analysis tool
+        async function checkAIIntelStatus() {
+            try {
+                const response = await fetch('/api/trends/intel/status');
+                const data = await response.json();
+                console.log('AI Intel status:', data.data);
+                return data.data || { isReady: false, status: 'unknown', aiCoverage: 0 };
+            } catch (error) {
+                console.error('Failed to check AI Intel status:', error);
+                return { isReady: false, status: 'error', aiCoverage: 0 };
+            }
+        }
+
+        // Fetch Strategic Insights from Trend Analysis AI Intel briefing
+        async function fetchStrategicInsights() {
+            try {
+                const response = await fetch('/api/trends/strategic-insights');
+                const data = await response.json();
+                console.log('Strategic Insights fetched:', data.data);
+                return data.data;
+            } catch (error) {
+                console.error('Failed to fetch Strategic Insights:', error);
+                // Fallback to raw trends data if Strategic Insights unavailable
+                return {
+                    strategicInsights: { overview: 'Strategic Insights temporarily unavailable' },
+                    topTrends: await fetchTrendsData(),
+                    marketContext: { note: 'Using fallback data' }
+                };
+            }
+        }
+
+        // Trigger AI analysis if needed
+        async function triggerAIAnalysis() {
+            try {
+                crossoverContent.innerHTML = `<div class="loading"><div class="spinner"></div>Triggering AI analysis...</div>`;
+
+                const response = await fetch('/api/trends/intel/trigger', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    crossoverContent.innerHTML = `
+                        <div class="insight-card">
+                            <h3><i class="fas fa-check"></i> AI Analysis Triggered</h3>
+                            <p>${data.data.message}</p>
+                            <p>Status: ${data.data.status}</p>
+                            <button onclick="generateCrossoverInsights()" style="margin-top: 10px; padding: 8px 16px; background: #31BDBF; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                Refresh Insights
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Failed to trigger AI analysis:', error);
+                crossoverContent.innerHTML = `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-exclamation-triangle"></i> Failed to Trigger Analysis</h3>
+                        <p>Unable to trigger AI analysis. Please try again.</p>
+                    </div>
+                `;
+            }
         }
 
         // Update counters
