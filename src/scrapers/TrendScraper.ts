@@ -2,8 +2,10 @@ import { BrowserManager } from '../utils/browser';
 import { AIEnrichmentService } from '../services/ai-enrichment';
 import { TrendSource, TrendData } from '../types';
 import { TikTokSource } from './sources/tiktok';
-import { PinterestSource } from './sources/pinterest';
+// import { PinterestSource } from './sources/pinterest'; // Replaced with Apify version
 import { ApifyTikTokHashtagSource } from './sources/apify-tiktok-hashtags';
+import { ApifyInstagramSource } from './sources/apify-instagram';
+import { ApifyPinterestSource } from './sources/apify-pinterest';
 // import { TwitterSource } from './sources/twitter';
 import { Trends24Source } from './sources/trends24';
 import Trend from '../models/Trend';
@@ -25,9 +27,11 @@ export class TrendScraper {
     this.aiService = new AIEnrichmentService();
     this.sources = [
       ApifyTikTokHashtagSource, // Use Apify for better TikTok hashtag data
+      ApifyInstagramSource, // Add Instagram trending hashtags
+      ApifyPinterestSource, // Use Apify for better Pinterest data
       TikTokSource, // Keep as fallback
-      PinterestSource,
       Trends24Source // Using Trends24 instead of direct X.com due to auth requirements
+      // PinterestSource, // Disabled - replaced with Apify version
       // TwitterSource // Disabled - X.com requires authentication as of 2025
     ];
   }
