@@ -58,7 +58,7 @@ class ProgressManager {
       isRunning: true,
       currentSource: null,
       progress: 0,
-      totalSources: 3,
+      totalSources: 2,
       completedSources: 0,
       trends: [],
       errors: [],
@@ -66,7 +66,6 @@ class ProgressManager {
       lastUpdate: new Date(),
       sources: [
         { name: 'Apify TikTok Hashtag Trends', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
-        { name: 'TikTok Creative Center', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
         { name: 'Trends24 (X/Twitter US)', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' }
       ]
     };

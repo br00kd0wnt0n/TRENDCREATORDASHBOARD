@@ -29,7 +29,7 @@ export class TrendScraper {
       ApifyTikTokHashtagSource, // Use Apify for better TikTok hashtag data (WORKING ✅)
       // ApifyInstagramSource, // TODO: Fix data extraction - returns data but no hashtags extracted
       // ApifyPinterestSource, // TODO: Fix input configuration - still getting 400 errors
-      TikTokSource, // Keep as fallback
+      // TikTokSource, // DISABLED: Was overwriting good Apify data with 3 generic trends
       Trends24Source // Using Trends24 instead of direct X.com due to auth requirements
       // PinterestSource, // Disabled - replaced with Apify version
       // TwitterSource // Disabled - X.com requires authentication as of 2025

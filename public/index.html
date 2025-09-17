@@ -1312,7 +1312,7 @@
                 const params = new URLSearchParams();
                 if (platform) params.append('platform', platform);
                 if (sentiment) params.append('sentiment', sentiment);
-                params.append('limit', '30');
+                params.append('limit', '100'); // Show more trends - TODO: Add pagination
 
                 const response = await fetch(`/api/trends?${params}`);
                 const data = await response.json();
