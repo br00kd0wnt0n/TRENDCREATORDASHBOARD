@@ -3,6 +3,7 @@ import { AIEnrichmentService } from '../services/ai-enrichment';
 import { TrendSource, TrendData } from '../types';
 import { TikTokSource } from './sources/tiktok';
 import { PinterestSource } from './sources/pinterest';
+import { ApifyTikTokHashtagSource } from './sources/apify-tiktok-hashtags';
 // import { TwitterSource } from './sources/twitter';
 import { Trends24Source } from './sources/trends24';
 import Trend from '../models/Trend';
@@ -23,7 +24,8 @@ export class TrendScraper {
     this.browserManager = new BrowserManager();
     this.aiService = new AIEnrichmentService();
     this.sources = [
-      TikTokSource,
+      ApifyTikTokHashtagSource, // Use Apify for better TikTok hashtag data
+      TikTokSource, // Keep as fallback
       PinterestSource,
       Trends24Source // Using Trends24 instead of direct X.com due to auth requirements
       // TwitterSource // Disabled - X.com requires authentication as of 2025
