@@ -192,20 +192,31 @@ app.get('/api/trends/narrative', async (_req, res) => {
       raw: true
     });
 
-    // Get recent trends for context (lowered confidence threshold)
-    const topTrends = await Trend.findAll({
+    // Get top trends with platform diversity (5 from each major platform)
+    const tiktokTrends = await Trend.findAll({
       where: {
-        confidence: {
-          [Op.gte]: 0.1
-        }
+        platform: 'TikTok',
+        confidence: { [Op.gte]: 0.1 }
       },
-      order: [
-        ['confidence', 'DESC'],
-        ['scrapedAt', 'DESC']
-      ],
-      limit: 10,
+      order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+      limit: 5,
       raw: true
     });
+
+    const twitterTrends = await Trend.findAll({
+      where: {
+        platform: 'X (Twitter)',
+        confidence: { [Op.gte]: 0.1 }
+      },
+      order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+      limit: 5,
+      raw: true
+    });
+
+    // Combine and shuffle for platform diversity
+    const topTrends = [...tiktokTrends, ...twitterTrends]
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 10);
 
     // Get all recent trends to analyze content patterns
     const allRecentTrends = await Trend.findAll({
