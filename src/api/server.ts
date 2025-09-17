@@ -420,15 +420,16 @@ app.get('/api/scrape/history', async (_req, res) => {
     // Get scrape history by grouping trends by scrapedAt date/time
     const scrapeHistory = await Trend.findAll({
       attributes: [
-        [Trend.sequelize!.fn('DATE_TRUNC', 'minute', Trend.sequelize!.col('scrapedAt')), 'scrapeTime'],
+        // Group by 15-minute intervals to capture sequential scraper runs as single session
+        [Trend.sequelize!.literal("DATE_TRUNC('minute', \"scrapedAt\") - INTERVAL '1 minute' * (EXTRACT(minute FROM \"scrapedAt\")::int % 15)"), 'scrapeTime'],
         [Trend.sequelize!.fn('COUNT', '*'), 'totalTrends'],
-        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'tiktok' THEN 1 END")), 'tiktokTrends'],
-        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'pinterest' THEN 1 END")), 'pinterestTrends'],
-        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'twitter' THEN 1 END")), 'twitterTrends'],
+        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'TikTok' THEN 1 END")), 'tiktokTrends'],
+        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'Pinterest' THEN 1 END")), 'pinterestTrends'],
+        [Trend.sequelize!.fn('COUNT', Trend.sequelize!.literal("CASE WHEN platform = 'X (Twitter)' THEN 1 END")), 'twitterTrends'],
         [Trend.sequelize!.fn('AVG', Trend.sequelize!.col('confidence')), 'avgConfidence']
       ],
-      group: [Trend.sequelize!.fn('DATE_TRUNC', 'minute', Trend.sequelize!.col('scrapedAt'))],
-      order: [[Trend.sequelize!.fn('DATE_TRUNC', 'minute', Trend.sequelize!.col('scrapedAt')), 'DESC']],
+      group: ['scrapeTime'],
+      order: [['scrapeTime', 'DESC']],
       limit: 20,
       raw: true
     });
