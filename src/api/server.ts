@@ -482,11 +482,14 @@ app.get('/api/debug/trends', async (_req, res) => {
 // Debug endpoint to clear all trends
 app.delete('/api/debug/trends', async (_req, res) => {
   try {
-    const deletedCount = await Trend.destroy({
-      where: {},
-      truncate: true
-    });
-    
+    // Get count before deletion
+    const countBefore = await Trend.count();
+
+    // Delete all records
+    await Trend.truncate({ cascade: true });
+
+    const deletedCount = countBefore;
+
     logger.info(`🗑️ Cleared ${deletedCount} trends from database`);
     res.json({
       success: true,
@@ -494,9 +497,9 @@ app.delete('/api/debug/trends', async (_req, res) => {
     });
   } catch (error) {
     logger.error('Clear trends failed:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to clear trends' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to clear trends'
     });
   }
 });
