@@ -841,7 +841,7 @@
                     <option value="">All Platforms</option>
                     <option value="TikTok">TikTok</option>
                     <option value="Pinterest">Pinterest</option>
-                    <option value="Twitter/X">Twitter/X</option>
+                    <option value="X (Twitter)">X (Twitter)</option>
                 </select>
             </div>
 
@@ -1063,6 +1063,11 @@
                             <div class="top-trends-header">
                                 <i class="fas fa-fire"></i>
                                 <h3>Top 10 Trending Hashtags</h3>
+                                <select id="top10Platform" style="margin-left: 10px; padding: 5px;">
+                                    <option value="">All Platforms</option>
+                                    <option value="TikTok">TikTok Only</option>
+                                    <option value="X (Twitter)">X (Twitter) Only</option>
+                                </select>
                             </div>
                             <table class="trends-table">
                                 <thead>
@@ -1735,14 +1740,40 @@
             }
         }
 
+        // Filter Top 10 trends by platform
+        function filterTop10Trends() {
+            const selectedPlatform = document.getElementById('top10Platform').value;
+            const rows = document.querySelectorAll('.top-trends-section tbody tr');
+
+            rows.forEach(row => {
+                if (!selectedPlatform) {
+                    row.style.display = '';
+                } else {
+                    const platformBadge = row.querySelector('.platform-badge');
+                    const platform = platformBadge ? platformBadge.textContent.trim() : '';
+                    row.style.display = platform === selectedPlatform ? '' : 'none';
+                }
+            });
+        }
+
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', () => {
             loadStats();
             loadTrends();
             loadNarrative();
-            
+
             document.getElementById('platform').addEventListener('change', loadTrends);
             document.getElementById('sentiment').addEventListener('change', loadTrends);
+
+            // Add Top 10 platform filter when narrative loads
+            const observer = new MutationObserver(() => {
+                const top10Filter = document.getElementById('top10Platform');
+                if (top10Filter && !top10Filter.hasEventListener) {
+                    top10Filter.addEventListener('change', filterTop10Trends);
+                    top10Filter.hasEventListener = true;
+                }
+            });
+            observer.observe(document.getElementById('narrativeContent'), { childList: true, subtree: true });
         });
 
         // Removed automatic refresh - now manual scraping only

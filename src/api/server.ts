@@ -82,7 +82,7 @@ app.get('/api/trends', async (_req, res) => {
 
     const trends = await Trend.findAndCountAll({
       where: whereClause,
-      order: [['scrapedAt', 'DESC']],
+      order: [['scrapedAt', 'DESC'], ['platform', 'ASC']], // Mix platforms with same timestamp
       limit: Math.min(parseInt(limit as string), 200), // Allow up to 200 trends
       offset: parseInt(offset as string),
       raw: true
