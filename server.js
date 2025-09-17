@@ -242,38 +242,91 @@ Format as JSON with this structure:
 async function generateCreatorToTrendInsights(creatorData, trendsContext, specific = false, tabContext = '') {
   const isSpecificCreator = specific && creatorData.length === 1;
   const creatorCount = creatorData.length;
+  const creator = isSpecificCreator ? creatorData[0] : null;
 
-  const prompt = `
-As an expert in social media trends and creator strategy, analyze ${isSpecificCreator ? 'this specific creator\'s profile' : `these ${creatorCount} creators`} and suggest trending topics they should leverage.
+  let prompt;
 
-${isSpecificCreator ? 'SPECIFIC CREATOR BEING ANALYZED:' : `${creatorCount} CREATORS IN ANALYSIS:`}
+  if (isSpecificCreator && creator) {
+    // Highly personalized prompt for individual creator
+    prompt = `
+As an expert social media strategist, create a PERSONALIZED trend strategy for this specific creator. Analyze their unique profile deeply and recommend trending opportunities that match their exact brand, audience, and content style.
+
+CREATOR PROFILE IN FOCUS:
+Name: ${creator.full_name || creator.name}
+Content Type: ${creator.primary_content_type || 'Not specified'}
+Audience Size: ${creator.audience_size || 'Unknown'}
+Engagement Rate: ${creator.engagement_rate || 'Unknown'}%
+Platforms: ${[creator.instagram, creator.tiktok, creator.youtube, creator.twitter].filter(Boolean).join(', ') || 'Not specified'}
+Tags/Niche: ${creator.tags ? creator.tags.join(', ') : 'Not specified'}
+Notes: ${creator.notes || 'No additional notes'}
+Verified: ${creator.verified ? 'Yes' : 'No'}
+
+CURRENT TRENDING OPPORTUNITIES:
+${JSON.stringify(trendsContext.slice(0, 10), null, 2)}
+
+PROVIDE HIGHLY SPECIFIC RECOMMENDATIONS:
+1. Which 3-5 trending topics are PERFECT matches for ${creator.full_name || 'this creator'}
+2. Why each trend aligns with their specific content type: ${creator.primary_content_type}
+3. Exact content ideas they should create (be specific to their style)
+4. Which platforms to prioritize based on their audience size of ${creator.audience_size}
+5. Timing strategy for maximum impact
+6. Expected engagement boost for their current ${creator.engagement_rate}% rate
+7. How to leverage their ${creator.verified ? 'verified status' : 'growing influence'}
+
+Format as JSON with this structure:
+{
+  "creatorInsights": "Deep personalized strategy for ${creator.full_name || 'this creator'} based on their ${creator.primary_content_type} content and ${creator.audience_size} audience",
+  "recommendedTrends": [
+    {
+      "hashtag": "#trendhashtag",
+      "platform": "best platform for this creator",
+      "matchScore": 0.95,
+      "reasoning": "Specific reason why this trend is perfect for ${creator.full_name || 'this creator'}'s ${creator.primary_content_type} content",
+      "contentIdeas": ["Very specific content idea 1", "Specific idea 2"],
+      "timing": "urgent|this_week|this_month",
+      "expectedReach": "High|Medium|Low",
+      "engagementBoost": "Expected % increase in engagement"
+    }
+  ],
+  "platformStrategy": {
+    "primary": "Strategy for their main platform",
+    "secondary": "Strategy for secondary platforms",
+    "growth": "How to grow from ${creator.audience_size} audience"
+  },
+  "personalizedTips": ["Specific tip 1 for ${creator.primary_content_type}", "Specific tip 2"]
+}
+`;
+  } else {
+    // General prompt for multiple creators
+    prompt = `
+As an expert in social media trends and creator strategy, analyze these ${creatorCount} creators and suggest trending topics they should collectively leverage.
+
+CREATORS IN ANALYSIS:
 ${JSON.stringify(creatorData, null, 2)}
 
 CURRENT TRENDING TOPICS:
 ${JSON.stringify(trendsContext.slice(0, 15), null, 2)}
 
 Please provide:
-1. Top 5 trending topics this creator should leverage
+1. Top 5 trending topics these creators should leverage
 2. Specific content ideas for each trend
-3. Timing recommendations (urgent, this week, this month)
-4. Platform-specific strategies
-5. Potential reach and engagement predictions
+3. Platform-specific strategies
+4. General timing recommendations
 
 Format as JSON with this structure:
 {
   "recommendedTrends": [
     {
-      "trendId": "uuid",
       "hashtag": "#trendhashtag",
       "platform": "platform",
       "matchScore": 0.90,
-      "reasoning": "Why this trend matches the creator",
+      "reasoning": "Why this trend matches these creators",
       "contentIdeas": ["idea1", "idea2"],
       "timing": "urgent|this_week|this_month",
       "expectedReach": "High|Medium|Low"
     }
   ],
-  "creatorInsights": "Overall strategy insights for the creator",
+  "creatorInsights": "Overall strategy insights for the creators",
   "platformStrategy": {
     "instagram": "strategy",
     "tiktok": "strategy",
@@ -281,6 +334,7 @@ Format as JSON with this structure:
   }
 }
 `;
+  }
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4-turbo-preview",

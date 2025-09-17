@@ -760,10 +760,48 @@
                 `;
 
                 Object.entries(insights.platformStrategy).forEach(([platform, strategy]) => {
-                    html += `<p><strong>${platform}:</strong> ${strategy}</p>`;
+                    html += `<p><strong>${platform.charAt(0).toUpperCase() + platform.slice(1)}:</strong> ${strategy}</p>`;
                 });
 
                 html += '</div>';
+            }
+
+            // Show personalized tips if available (for specific creator analysis)
+            if (insights.personalizedTips && insights.personalizedTips.length > 0) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-star"></i> Personalized Tips</h3>
+                        <ul>
+                `;
+
+                insights.personalizedTips.forEach(tip => {
+                    html += `<li><i class="fas fa-lightbulb"></i> ${tip}</li>`;
+                });
+
+                html += '</ul></div>';
+            }
+
+            // Show engagement boost predictions if available
+            if (insights.recommendedTrends && insights.recommendedTrends.some(trend => trend.engagementBoost)) {
+                html += `
+                    <div class="insight-card">
+                        <h3><i class="fas fa-chart-line"></i> Engagement Predictions</h3>
+                        <ul class="recommendation-list">
+                `;
+
+                insights.recommendedTrends.filter(trend => trend.engagementBoost).forEach(trend => {
+                    html += `
+                        <li>
+                            <span class="match-score">${trend.engagementBoost}</span>
+                            <div>
+                                <strong>${trend.hashtag}</strong><br>
+                                <small>Expected engagement boost</small>
+                            </div>
+                        </li>
+                    `;
+                });
+
+                html += '</ul></div>';
             }
 
             crossoverContent.innerHTML = html;
@@ -942,16 +980,33 @@
             console.log('Creators tool loaded');
             // Try to detect creator selection via URL changes
             try {
+                let lastUrl = '';
                 const checkUrl = setInterval(() => {
-                    const url = creatorsFrame.contentWindow.location.href;
-                    if (url.includes('/creators/') && !url.endsWith('/creators')) {
-                        // Extract creator ID from URL
-                        const creatorId = url.split('/creators/')[1];
-                        if (creatorId && creatorId !== selectedCreator?.id) {
-                            console.log('Creator ID from URL:', creatorId);
-                            // Fetch creator data
-                            fetchCreatorById(creatorId);
+                    try {
+                        const url = creatorsFrame.contentWindow.location.href;
+                        if (url !== lastUrl) {
+                            lastUrl = url;
+                            console.log('Creator iframe URL changed:', url);
+
+                            if (url.includes('/creators/') && !url.endsWith('/creators')) {
+                                // Extract creator ID from URL
+                                const creatorId = url.split('/creators/')[1].split('?')[0].split('#')[0];
+                                if (creatorId && creatorId !== selectedCreator?.id) {
+                                    console.log('Detected specific creator page:', creatorId);
+                                    // Fetch creator data and trigger specific analysis
+                                    fetchCreatorById(creatorId, true); // true = specific analysis
+                                }
+                            } else if (url.includes('/creators') && !url.includes('/creators/')) {
+                                // Back to creators list - clear selection
+                                console.log('Back to creators list - clearing selection');
+                                selectedCreator = null;
+                                if (!crossoverPanel.classList.contains('collapsed') && currentTab === 'creators') {
+                                    generateCrossoverInsights(); // General insights
+                                }
+                            }
                         }
+                    } catch (urlError) {
+                        // URL access blocked by CORS - that's expected
                     }
                 }, 1000);
             } catch (e) {
@@ -960,17 +1015,20 @@
         });
 
         // Fetch specific creator data
-        async function fetchCreatorById(creatorId) {
+        async function fetchCreatorById(creatorId, isSpecificPage = false) {
             try {
                 const response = await fetch(`/api/creators/creators/${creatorId}`);
                 const creator = await response.json();
                 if (creator) {
                     selectedCreator = creator;
+                    console.log('Selected creator for analysis:', creator.full_name, 'on specific page:', isSpecificPage);
+
                     if (!crossoverPanel.classList.contains('collapsed') && currentTab === 'creators') {
                         generateCrossoverInsights({
                             type: 'creator',
                             data: creator,
-                            name: creator.full_name || creator.name
+                            name: creator.full_name || creator.name,
+                            isSpecificPage: isSpecificPage
                         });
                     }
                 }
