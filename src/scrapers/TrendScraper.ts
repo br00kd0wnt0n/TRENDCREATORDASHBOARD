@@ -26,9 +26,9 @@ export class TrendScraper {
     this.browserManager = new BrowserManager();
     this.aiService = new AIEnrichmentService();
     this.sources = [
-      ApifyTikTokHashtagSource, // Use Apify for better TikTok hashtag data
-      ApifyInstagramSource, // Add Instagram trending hashtags
-      ApifyPinterestSource, // Use Apify for better Pinterest data
+      ApifyTikTokHashtagSource, // Use Apify for better TikTok hashtag data (WORKING ✅)
+      // ApifyInstagramSource, // TODO: Fix data extraction - returns data but no hashtags extracted
+      // ApifyPinterestSource, // TODO: Fix input configuration - still getting 400 errors
       TikTokSource, // Keep as fallback
       Trends24Source // Using Trends24 instead of direct X.com due to auth requirements
       // PinterestSource, // Disabled - replaced with Apify version

@@ -26,16 +26,13 @@ export const ApifyInstagramSource: TrendSource = {
         'art', 'photography', 'music', 'technology', 'business'
       ];
 
-      // Start the Instagram hashtag scraper
+      // Start the Instagram hashtag scraper with simplified input
       const runResponse = await axios.post(
         'https://api.apify.com/v2/acts/easyapi~instagram-hashtag-scraper/runs',
         {
           input: {
-            hashtags: hashtagCategories,
-            limit: 50,
-            resultsLimit: 100,
-            includeMetrics: true,
-            sortBy: 'popularity'
+            hashtags: hashtagCategories.slice(0, 5),
+            maxResults: 50
           }
         },
         {

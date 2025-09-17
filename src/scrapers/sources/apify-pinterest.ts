@@ -20,36 +20,33 @@ export const ApifyPinterestSource: TrendSource = {
         return [];
       }
 
-      // Search for trending topics on Pinterest
-      const trendingSearches = [
-        'trending ideas',
-        'popular pins',
-        'trending fashion',
-        'trending home decor',
-        'trending recipes',
-        'trending beauty',
-        'trending diy',
-        'trending wedding',
-        'trending hairstyles',
-        'trending art'
-      ];
+      // Search for trending topics on Pinterest - using direct URLs instead
 
-      // Start the Pinterest scraper
+      // Start the Pinterest scraper with token as query parameter
       const runResponse = await axios.post(
-        'https://api.apify.com/v2/acts/epctex~pinterest-scraper/runs',
+        `https://api.apify.com/v2/acts/epctex~pinterest-scraper/runs?token=${APIFY_TOKEN}`,
         {
           input: {
-            searchQueries: trendingSearches,
-            maxPins: 100,
-            includeBoards: false,
-            includeUsers: false,
-            onlyTrending: true,
-            sortBy: 'trending'
+            startUrls: [
+              "https://www.pinterest.com/search/pins/?q=trending",
+              "https://www.pinterest.com/search/pins/?q=viral",
+              "https://www.pinterest.com/search/pins/?q=popular",
+              "https://www.pinterest.com/search/pins/?q=fashion%20trends",
+              "https://www.pinterest.com/search/pins/?q=home%20decor"
+            ],
+            customMapFunction: "(object) => { return {...object} }",
+            endPage: 1,
+            extendOutputFunction: "($) => { return {} }",
+            includeComments: false,
+            includeUserInfoOnly: false,
+            maxItems: 50,
+            proxy: {
+              useApifyProxy: true
+            }
           }
         },
         {
           headers: {
-            'Authorization': `Bearer ${APIFY_TOKEN}`,
             'Content-Type': 'application/json'
           },
           timeout: 15000
@@ -68,10 +65,7 @@ export const ApifyPinterestSource: TrendSource = {
         await new Promise(resolve => setTimeout(resolve, 15000)); // Wait 15 seconds
 
         const statusResponse = await axios.get(
-          `https://api.apify.com/v2/actor-runs/${runId}`,
-          {
-            headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` }
-          }
+          `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`
         );
 
         runStatus = statusResponse.data.data.status;
@@ -86,10 +80,7 @@ export const ApifyPinterestSource: TrendSource = {
 
       // Get results
       const resultsResponse = await axios.get(
-        `https://api.apify.com/v2/datasets/${runResponse.data.data.defaultDatasetId}/items`,
-        {
-          headers: { 'Authorization': `Bearer ${APIFY_TOKEN}` }
-        }
+        `https://api.apify.com/v2/datasets/${runResponse.data.data.defaultDatasetId}/items?token=${APIFY_TOKEN}`
       );
 
       const pinterestResults = resultsResponse.data;
