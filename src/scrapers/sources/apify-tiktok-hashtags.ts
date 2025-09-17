@@ -87,18 +87,16 @@ export const ApifyTikTokHashtagSource: TrendSource = {
         let popularity = 'Trending';
         let category = 'General';
 
-        // Extract hashtag
-        if (item.hashtag) {
+        // Extract hashtag from the correct field
+        if (item.hashtag_name) {
+          hashtag = `#${item.hashtag_name}`;
+        } else if (item.hashtag) {
           hashtag = item.hashtag.startsWith('#') ? item.hashtag : `#${item.hashtag}`;
-        } else if (item.name) {
-          hashtag = item.name.startsWith('#') ? item.name : `#${item.name}`;
-        } else if (item.tag) {
-          hashtag = item.tag.startsWith('#') ? item.tag : `#${item.tag}`;
         }
 
-        // Extract popularity metrics
-        if (item.views || item.viewCount) {
-          const views = parseInt(item.views || item.viewCount);
+        // Extract popularity metrics from Apify data structure
+        if (item.video_views) {
+          const views = parseInt(item.video_views);
           if (views > 1000000) {
             popularity = `${(views / 1000000).toFixed(1)}M views`;
           } else if (views > 1000) {
@@ -106,8 +104,8 @@ export const ApifyTikTokHashtagSource: TrendSource = {
           } else {
             popularity = `${views} views`;
           }
-        } else if (item.posts || item.postCount || item.videoCount) {
-          const count = parseInt(item.posts || item.postCount || item.videoCount);
+        } else if (item.publish_cnt) {
+          const count = parseInt(item.publish_cnt);
           if (count > 1000000) {
             popularity = `${(count / 1000000).toFixed(1)}M posts`;
           } else if (count > 1000) {
@@ -115,14 +113,15 @@ export const ApifyTikTokHashtagSource: TrendSource = {
           } else {
             popularity = `${count} posts`;
           }
-        } else if (item.rank || item.position) {
-          popularity = `#${item.rank || item.position} trending`;
+        } else if (item.rank) {
+          popularity = `#${item.rank} trending`;
         }
 
-        // Categorize based on hashtag content and metadata
-        if (item.category) {
-          category = item.category;
+        // Extract category from Apify industry_info
+        if (item.industry_info && item.industry_info.value) {
+          category = item.industry_info.value;
         } else {
+          // Fallback categorization based on hashtag content
           const hashtagLower = hashtag.toLowerCase();
           if (hashtagLower.includes('sport') || hashtagLower.includes('game') || hashtagLower.includes('fitness') || hashtagLower.includes('soccer') || hashtagLower.includes('basketball')) {
             category = 'Sports & Outdoor';
