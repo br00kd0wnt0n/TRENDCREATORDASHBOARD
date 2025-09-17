@@ -1,7 +1,7 @@
 import { BrowserManager } from '../utils/browser';
 import { AIEnrichmentService } from '../services/ai-enrichment';
 import { TrendSource, TrendData } from '../types';
-import { TikTokSource } from './sources/tiktok';
+// import { TikTokSource } from './sources/tiktok'; // Replaced with Apify version - much better data
 // import { PinterestSource } from './sources/pinterest'; // Replaced with Apify version
 import { ApifyTikTokHashtagSource } from './sources/apify-tiktok-hashtags';
 // import { ApifyInstagramSource } from './sources/apify-instagram';
