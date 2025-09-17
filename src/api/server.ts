@@ -215,7 +215,7 @@ app.get('/api/trends/narrative', async (_req, res) => {
 
     // Combine and shuffle for platform diversity
     const topTrends = [...tiktokTrends, ...twitterTrends]
-      .sort((a, b) => b.confidence - a.confidence)
+      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
       .slice(0, 10);
 
     // Get all recent trends to analyze content patterns
