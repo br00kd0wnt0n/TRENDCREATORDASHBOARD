@@ -4,8 +4,8 @@ import { TrendSource, TrendData } from '../types';
 import { TikTokSource } from './sources/tiktok';
 // import { PinterestSource } from './sources/pinterest'; // Replaced with Apify version
 import { ApifyTikTokHashtagSource } from './sources/apify-tiktok-hashtags';
-import { ApifyInstagramSource } from './sources/apify-instagram';
-import { ApifyPinterestSource } from './sources/apify-pinterest';
+// import { ApifyInstagramSource } from './sources/apify-instagram';
+// import { ApifyPinterestSource } from './sources/apify-pinterest';
 // import { TwitterSource } from './sources/twitter';
 import { Trends24Source } from './sources/trends24';
 import Trend from '../models/Trend';
