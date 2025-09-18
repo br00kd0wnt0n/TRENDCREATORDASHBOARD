@@ -107,7 +107,8 @@ app.get('/api/trends', async (_req, res) => {
   }
 });
 
-app.get('/api/trends/stats', async (_req, res) => {
+// Stats endpoint - available at both paths for proxy compatibility
+app.get(['/api/trends/stats', '/api/stats'], async (_req, res) => {
   try {
     const totalTrends = await Trend.count();
     const recentTrends = await Trend.count({
