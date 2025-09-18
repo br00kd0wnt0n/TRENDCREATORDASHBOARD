@@ -86,7 +86,7 @@ app.get('/api/trends/*', async (req, res) => {
 
     const response = await axios.get(apiUrl, {
       params: req.query,
-      timeout: 10000
+      timeout: 30000 // Increased timeout for AI-intensive endpoints
     });
     res.json(response.data);
   } catch (error) {
@@ -114,7 +114,7 @@ app.post('/api/trends/*', async (req, res) => {
 
     const response = await axios.post(apiUrl, req.body, {
       headers: { 'Content-Type': 'application/json' },
-      timeout: 10000
+      timeout: 30000 // Increased timeout for AI-intensive endpoints
     });
     res.json(response.data);
   } catch (error) {
