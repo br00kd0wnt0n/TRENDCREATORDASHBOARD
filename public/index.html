@@ -522,6 +522,9 @@
                 <h2><i class="fas fa-brain"></i> AI Crossover Insights</h2>
                 <p>Intelligent connections between trends and creators</p>
             </div>
+            <button class="close-button" id="analyzeCreatorBtn" onclick="analyzeCurrentCreator()" title="Analyze current creator" style="margin-right: 8px; background: rgba(255, 255, 255, 0.3);">
+                <i class="fas fa-user-cog"></i>
+            </button>
             <button class="close-button" id="closePanel" title="Minimize panel">
                 <i class="fas fa-times"></i>
             </button>
@@ -620,6 +623,7 @@
         // Track selected items
         let selectedTrend = null;
         let selectedCreator = null;
+        let lastCreatorTitle = '';
 
         // Progress tracking for AI Crossover Insights
         function showProgressChecklist(steps) {
@@ -1310,13 +1314,81 @@
                             }
                         }
                     } catch (urlError) {
-                        // URL access blocked by CORS - that's expected
+                        console.log('Cannot access creator iframe URL - CORS restriction:', urlError.message);
+                        // URL access blocked by CORS - try alternative detection method
+
+                        // Try to detect creator page changes by monitoring the iframe's title or other accessible properties
+                        try {
+                            const iframeDoc = creatorsFrame.contentDocument || creatorsFrame.contentWindow.document;
+                            if (iframeDoc && iframeDoc.title !== lastCreatorTitle) {
+                                lastCreatorTitle = iframeDoc.title;
+                                console.log('Creator iframe title changed:', iframeDoc.title);
+
+                                // Check if this looks like a creator detail page title
+                                if (iframeDoc.title.includes(' - Creator') || iframeDoc.title.includes('Creator Profile')) {
+                                    console.log('Detected creator detail page via title change');
+                                    // For now, we can't extract the specific creator ID without URL access
+                                    // but we could potentially parse it from the document content
+                                }
+                            }
+                        } catch (docError) {
+                            console.log('Cannot access creator iframe document either - fully blocked by CORS');
+                        }
                     }
                 }, 1000);
             } catch (e) {
                 console.log('Cannot access creators iframe URL - CORS restriction');
             }
         });
+
+        // Manual trigger for current creator analysis
+        async function analyzeCurrentCreator() {
+            console.log('Manual trigger: Analyze Current Creator clicked');
+
+            if (currentTab !== 'creators') {
+                alert('Please switch to the Creator Rolodex tab first');
+                return;
+            }
+
+            try {
+                // Get all creators and let user pick, or try to detect from iframe title
+                const creatorsData = await fetchCreatorsData();
+                console.log('Available creators for manual analysis:', creatorsData.length);
+
+                // For now, show a simple prompt for creator selection
+                // In future, this could be enhanced with a dropdown or auto-detection
+                const creatorName = prompt('Enter the creator name you want to analyze (from the current page):');
+                if (!creatorName) return;
+
+                // Find matching creator
+                const matchingCreator = creatorsData.find(c =>
+                    (c.full_name && c.full_name.toLowerCase().includes(creatorName.toLowerCase())) ||
+                    (c.name && c.name.toLowerCase().includes(creatorName.toLowerCase()))
+                );
+
+                if (matchingCreator) {
+                    console.log('Found matching creator for manual analysis:', matchingCreator.full_name || matchingCreator.name);
+                    selectedCreator = matchingCreator;
+
+                    // Auto-expand panel and trigger analysis
+                    if (crossoverPanel.classList.contains('collapsed')) {
+                        crossoverPanel.classList.remove('collapsed');
+                    }
+
+                    generateCrossoverInsights({
+                        type: 'creator',
+                        data: matchingCreator,
+                        name: matchingCreator.full_name || matchingCreator.name,
+                        isSpecificPage: true
+                    });
+                } else {
+                    alert('Creator not found. Please make sure the name matches exactly.');
+                }
+            } catch (error) {
+                console.error('Manual creator analysis failed:', error);
+                alert('Failed to analyze creator. Please try again.');
+            }
+        }
 
         // Fetch specific creator data
         async function fetchCreatorById(creatorId, isSpecificPage = false) {

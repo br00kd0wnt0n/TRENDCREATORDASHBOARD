@@ -226,7 +226,7 @@ ${isSpecificTrend ? 'SPECIFIC TREND BEING ANALYZED:' : `TOP ${trendCount} AI-ANA
 ${JSON.stringify(trendData, null, 2)}
 
 AVAILABLE CREATORS CONTEXT:
-${JSON.stringify(creatorsContext.slice(0, 15), null, 2)}
+${JSON.stringify(creatorsContext, null, 2)}
 
 ${usingAIIntel ? `
 IMPORTANT: Use the Strategic Insights from the AI Intel briefing above to inform your analysis. Reference the key insights, market intelligence, and strategic recommendations when matching creators to trends.
@@ -346,7 +346,7 @@ CREATORS IN ANALYSIS:
 ${JSON.stringify(creatorData, null, 2)}
 
 CURRENT TRENDING TOPICS:
-${JSON.stringify(trendsContext.slice(0, 15), null, 2)}
+${JSON.stringify(trendsContext, null, 2)}
 
 Please provide:
 1. Top 5 trending topics these creators should leverage
