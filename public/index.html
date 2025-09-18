@@ -759,13 +759,31 @@
                     renderTrendToCreatorInsights(insights, specificItem, strategicInsights);
                     updateProgressStep('render-results', 'completed');
                 } else if (currentTab === 'creators') {
-                    // Get CREATOR data when on creators tab
+                    // Initialize progress for creator-to-trend analysis
+                    const creatorProgressSteps = [
+                        { id: 'creator-data', text: 'Loading creator profiles', status: 'in-progress' },
+                        { id: 'trends-context', text: 'Fetching trending topics database', status: 'pending' },
+                        { id: 'creator-analysis', text: 'Generating personalized trend recommendations', status: 'pending' },
+                        { id: 'creator-render', text: 'Displaying results', status: 'pending' }
+                    ];
+
+                    showProgressChecklist(creatorProgressSteps);
+
+                    // Step 1: Get CREATOR data when on creators tab
                     const creatorsData = specificItem && specificItem.type === 'creator' ?
                         [specificItem.data] : await fetchCurrentCreatorData();
-                    const trendsContext = await fetchTrendsData();
-
                     console.log('Generating creator-to-trend insights with:', creatorsData.length, 'creators');
 
+                    updateProgressStep('creator-data', 'completed', `${creatorsData.length} creator${creatorsData.length !== 1 ? 's' : ''} loaded`);
+                    updateProgressStep('trends-context', 'in-progress');
+
+                    // Step 2: Get trends context
+                    const trendsContext = await fetchTrendsData();
+
+                    updateProgressStep('trends-context', 'completed', `${trendsContext.length} trending topics retrieved`);
+                    updateProgressStep('creator-analysis', 'in-progress');
+
+                    // Step 3: Generate creator-to-trend insights
                     insights = await fetch('/api/crossover/insights', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -778,7 +796,12 @@
                         })
                     }).then(r => r.json());
 
+                    updateProgressStep('creator-analysis', 'completed', 'Trend recommendations generated');
+                    updateProgressStep('creator-render', 'in-progress');
+
+                    // Step 4: Render results
                     renderCreatorToTrendInsights(insights, specificItem);
+                    updateProgressStep('creator-render', 'completed');
                 }
 
             } catch (error) {
@@ -1039,7 +1062,7 @@
 
         async function fetchCreatorsData() {
             try {
-                const response = await fetch('/api/creators/creators?limit=10');
+                const response = await fetch('/api/creators/creators');
                 const data = await response.json();
                 const creators = data.creators || data.data || data || [];
                 console.log('Fetched creators data:', creators.length || 0, 'creators');
