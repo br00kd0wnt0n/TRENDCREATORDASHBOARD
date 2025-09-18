@@ -308,6 +308,95 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Progress Checklist */
+        .progress-checklist {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border-left: 4px solid #31BDBF;
+        }
+
+        .progress-checklist h3 {
+            color: #31BDBF;
+            margin-bottom: 16px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .progress-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .progress-step.pending .progress-icon {
+            background: #f0f0f0;
+            color: #999;
+            border: 2px solid #ddd;
+        }
+
+        .progress-step.in-progress .progress-icon {
+            background: #31BDBF;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .progress-step.completed .progress-icon {
+            background: #22c55e;
+            color: white;
+        }
+
+        .progress-step.error .progress-icon {
+            background: #ef4444;
+            color: white;
+        }
+
+        .progress-text {
+            flex: 1;
+        }
+
+        .progress-step.pending .progress-text {
+            color: #999;
+        }
+
+        .progress-step.in-progress .progress-text {
+            color: #31BDBF;
+            font-weight: 500;
+        }
+
+        .progress-step.completed .progress-text {
+            color: #22c55e;
+        }
+
+        .progress-step.error .progress-text {
+            color: #ef4444;
+        }
+
+        .progress-detail {
+            font-size: 12px;
+            color: #666;
+            margin-left: 32px;
+            margin-top: 4px;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .header {
@@ -532,6 +621,48 @@
         let selectedTrend = null;
         let selectedCreator = null;
 
+        // Progress tracking for AI Crossover Insights
+        function showProgressChecklist(steps) {
+            const html = `
+                <div class="progress-checklist">
+                    <h3><i class="fas fa-tasks"></i> AI Crossover Analysis Progress</h3>
+                    ${steps.map(step => `
+                        <div class="progress-step ${step.status}" id="progress-${step.id}">
+                            <div class="progress-icon">
+                                ${step.status === 'pending' ? '○' :
+                                  step.status === 'in-progress' ? '◐' :
+                                  step.status === 'completed' ? '✓' : '✗'}
+                            </div>
+                            <div class="progress-text">
+                                ${step.text}
+                                ${step.detail ? `<div class="progress-detail">${step.detail}</div>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            crossoverContent.innerHTML = html;
+        }
+
+        function updateProgressStep(stepId, status, detail = '') {
+            const stepElement = document.getElementById(`progress-${stepId}`);
+            if (stepElement) {
+                stepElement.className = `progress-step ${status}`;
+                const icon = stepElement.querySelector('.progress-icon');
+                icon.textContent = status === 'pending' ? '○' :
+                                 status === 'in-progress' ? '◐' :
+                                 status === 'completed' ? '✓' : '✗';
+
+                const detailElement = stepElement.querySelector('.progress-detail');
+                if (detail && detailElement) {
+                    detailElement.textContent = detail;
+                } else if (detail) {
+                    const textElement = stepElement.querySelector('.progress-text');
+                    textElement.innerHTML += `<div class="progress-detail">${detail}</div>`;
+                }
+            }
+        }
+
         // Generate AI-powered crossover insights
         async function generateCrossoverInsights(specificItem = null) {
             try {
@@ -550,12 +681,23 @@
                 let insights;
 
                 if (currentTab === 'trends') {
-                    // First check if AI Intel briefing is ready
-                    crossoverContent.innerHTML = `<div class="loading"><div class="spinner"></div>Checking AI Intel briefing status...</div>`;
+                    // Initialize progress checklist
+                    const progressSteps = [
+                        { id: 'intel-status', text: 'Checking AI Intel briefing status', status: 'in-progress', detail: '' },
+                        { id: 'strategic-insights', text: 'Retrieving Strategic Insights', status: 'pending', detail: '' },
+                        { id: 'creators-data', text: 'Loading CREATOR database', status: 'pending', detail: '' },
+                        { id: 'crossover-analysis', text: 'Generating crossover recommendations', status: 'pending', detail: '' },
+                        { id: 'render-results', text: 'Displaying results', status: 'pending', detail: '' }
+                    ];
 
+                    showProgressChecklist(progressSteps);
+
+                    // Step 1: Check AI Intel briefing status
                     const intelStatus = await checkAIIntelStatus();
+                    console.log('AI Intel status:', intelStatus);
 
                     if (!intelStatus.isReady) {
+                        updateProgressStep('intel-status', 'error', `AI Coverage: ${Math.round(intelStatus.aiCoverage * 100)}%`);
                         crossoverContent.innerHTML = `
                             <div class="insight-card">
                                 <h3><i class="fas fa-clock"></i> AI Intel Briefing Loading</h3>
@@ -570,12 +712,29 @@
                         return;
                     }
 
-                    // Get Strategic Insights from Trend Analysis AI Intel briefing
-                    crossoverContent.innerHTML = `<div class="loading"><div class="spinner"></div>Retrieving Strategic Insights from AI Intel briefing...</div>`;
+                    updateProgressStep('intel-status', 'completed', `${intelStatus.recentTrends} trends analyzed`);
+                    updateProgressStep('strategic-insights', 'in-progress');
 
+                    // Step 2: Get Strategic Insights from Trend Analysis AI Intel briefing
                     const strategicInsights = await fetchStrategicInsights();
-                    const creatorsContext = await fetchCreatorsData();
+                    console.log('Strategic Insights fetched:', strategicInsights);
 
+                    if (!strategicInsights || !strategicInsights.topTrends) {
+                        updateProgressStep('strategic-insights', 'error', 'Failed to retrieve insights');
+                        return;
+                    }
+
+                    updateProgressStep('strategic-insights', 'completed', `${strategicInsights.topTrends.length} top trends retrieved`);
+                    updateProgressStep('creators-data', 'in-progress');
+
+                    // Step 3: Get creators data
+                    const creatorsContext = await fetchCreatorsData();
+                    console.log('Fetched creators data:', creatorsContext.length, 'creators');
+
+                    updateProgressStep('creators-data', 'completed', `${creatorsContext.length} creators loaded`);
+                    updateProgressStep('crossover-analysis', 'in-progress');
+
+                    // Step 4: Generate crossover insights
                     console.log('Generating trend-to-creator insights with Strategic Insights:', strategicInsights);
 
                     insights = await fetch('/api/crossover/insights', {
@@ -593,7 +752,12 @@
                         })
                     }).then(r => r.json());
 
+                    updateProgressStep('crossover-analysis', 'completed', 'AI recommendations generated');
+                    updateProgressStep('render-results', 'in-progress');
+
+                    // Step 5: Render results
                     renderTrendToCreatorInsights(insights, specificItem, strategicInsights);
+                    updateProgressStep('render-results', 'completed');
                 } else if (currentTab === 'creators') {
                     // Get CREATOR data when on creators tab
                     const creatorsData = specificItem && specificItem.type === 'creator' ?
