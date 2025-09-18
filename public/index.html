@@ -1327,7 +1327,25 @@
                     selectedCreator = creator;
                     console.log('Selected creator for analysis:', creator.full_name, 'on specific page:', isSpecificPage);
 
-                    if (!crossoverPanel.classList.contains('collapsed') && currentTab === 'creators') {
+                    // For specific creator pages, automatically show and trigger AI Crossover Insights
+                    if (isSpecificPage && currentTab === 'creators') {
+                        console.log('Auto-triggering AI Crossover Insights for specific creator:', creator.full_name);
+
+                        // Automatically expand the panel if collapsed
+                        if (crossoverPanel.classList.contains('collapsed')) {
+                            crossoverPanel.classList.remove('collapsed');
+                            console.log('Auto-expanded AI Crossover Insights panel for creator detail');
+                        }
+
+                        // Generate specific insights for this creator
+                        generateCrossoverInsights({
+                            type: 'creator',
+                            data: creator,
+                            name: creator.full_name || creator.name,
+                            isSpecificPage: isSpecificPage
+                        });
+                    } else if (!crossoverPanel.classList.contains('collapsed') && currentTab === 'creators') {
+                        // Standard logic for when panel is already open
                         generateCrossoverInsights({
                             type: 'creator',
                             data: creator,
