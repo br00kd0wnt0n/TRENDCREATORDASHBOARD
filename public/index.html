@@ -1341,9 +1341,9 @@
             }
         });
 
-        // Manual trigger for current creator analysis
+        // Auto-detect current creator from iframe and trigger analysis
         async function analyzeCurrentCreator() {
-            console.log('Manual trigger: Analyze Current Creator clicked');
+            console.log('Auto-detect: Analyze Current Creator clicked');
 
             if (currentTab !== 'creators') {
                 alert('Please switch to the Creator Rolodex tab first');
@@ -1351,29 +1351,98 @@
             }
 
             try {
-                // Get all creators and let user pick, or try to detect from iframe title
+                // Get all creators for matching
                 const creatorsData = await fetchCreatorsData();
-                console.log('Available creators for manual analysis:', creatorsData.length);
+                console.log('Available creators for auto-detection:', creatorsData.length);
 
-                // For now, show a simple prompt for creator selection
-                // In future, this could be enhanced with a dropdown or auto-detection
-                const creatorName = prompt('Enter the creator name you want to analyze (from the current page):');
-                if (!creatorName) return;
+                // Try to extract creator name from iframe
+                let detectedCreatorName = null;
 
-                // Find matching creator
-                const matchingCreator = creatorsData.find(c =>
-                    (c.full_name && c.full_name.toLowerCase().includes(creatorName.toLowerCase())) ||
-                    (c.name && c.name.toLowerCase().includes(creatorName.toLowerCase()))
-                );
+                try {
+                    const creatorsFrame = document.getElementById('creatorsFrame');
+                    if (creatorsFrame) {
+                        // Method 1: Try to get creator name from iframe title
+                        try {
+                            const iframeDoc = creatorsFrame.contentDocument || creatorsFrame.contentWindow.document;
+                            if (iframeDoc && iframeDoc.title) {
+                                console.log('Iframe title:', iframeDoc.title);
+
+                                // Extract creator name from title patterns like "John Doe - Creator Profile" or "Creator: John Doe"
+                                let titleMatch = iframeDoc.title.match(/^([^-]+)\s*-\s*Creator/i) ||
+                                               iframeDoc.title.match(/Creator:\s*([^|]+)/i) ||
+                                               iframeDoc.title.match(/^([^|]+)\s*\|\s*Creator/i);
+
+                                if (titleMatch) {
+                                    detectedCreatorName = titleMatch[1].trim();
+                                    console.log('Detected creator name from title:', detectedCreatorName);
+                                }
+                            }
+                        } catch (docError) {
+                            console.log('Cannot access iframe document');
+                        }
+
+                        // Method 2: Try to parse creator name from iframe content
+                        if (!detectedCreatorName) {
+                            try {
+                                const iframeDoc = creatorsFrame.contentDocument || creatorsFrame.contentWindow.document;
+                                if (iframeDoc) {
+                                    // Look for common creator name patterns in the page
+                                    const h1Elements = iframeDoc.querySelectorAll('h1');
+                                    const h2Elements = iframeDoc.querySelectorAll('h2');
+                                    const titleElements = iframeDoc.querySelectorAll('.creator-name, .profile-name, .title');
+
+                                    // Try h1 first, then h2, then specific classes
+                                    const allElements = [...h1Elements, ...h2Elements, ...titleElements];
+
+                                    for (const element of allElements) {
+                                        const text = element.textContent.trim();
+                                        if (text && text.length > 2 && text.length < 50 && !text.toLowerCase().includes('creator') && !text.toLowerCase().includes('profile')) {
+                                            detectedCreatorName = text;
+                                            console.log('Detected creator name from content:', detectedCreatorName);
+                                            break;
+                                        }
+                                    }
+                                }
+                            } catch (contentError) {
+                                console.log('Cannot parse iframe content');
+                            }
+                        }
+                    }
+                } catch (iframeError) {
+                    console.log('Cannot access iframe for creator detection');
+                }
+
+                // If no automatic detection, show options
+                if (!detectedCreatorName) {
+                    console.log('Auto-detection failed, showing manual options');
+
+                    // Create a simple selection interface
+                    const creatorNames = creatorsData.map(c => c.full_name || c.name).filter(Boolean);
+                    const selectedName = prompt(
+                        `Could not auto-detect creator name. Please select from:\n\n${creatorNames.slice(0, 10).join('\n')}\n\nEnter the exact name:`
+                    );
+
+                    if (!selectedName) return;
+                    detectedCreatorName = selectedName;
+                }
+
+                // Find matching creator in database
+                const matchingCreator = creatorsData.find(c => {
+                    const fullName = c.full_name || c.name || '';
+                    return fullName.toLowerCase().includes(detectedCreatorName.toLowerCase()) ||
+                           detectedCreatorName.toLowerCase().includes(fullName.toLowerCase());
+                });
 
                 if (matchingCreator) {
-                    console.log('Found matching creator for manual analysis:', matchingCreator.full_name || matchingCreator.name);
+                    console.log('Found matching creator for analysis:', matchingCreator.full_name || matchingCreator.name);
                     selectedCreator = matchingCreator;
 
                     // Auto-expand panel and trigger analysis
                     if (crossoverPanel.classList.contains('collapsed')) {
                         crossoverPanel.classList.remove('collapsed');
                     }
+
+                    console.log('🎯 Auto-triggering specific creator analysis for:', matchingCreator.full_name || matchingCreator.name);
 
                     generateCrossoverInsights({
                         type: 'creator',
@@ -1382,10 +1451,11 @@
                         isSpecificPage: true
                     });
                 } else {
-                    alert('Creator not found. Please make sure the name matches exactly.');
+                    console.log('No matching creator found for:', detectedCreatorName);
+                    alert(`Creator "${detectedCreatorName}" not found in database. Please try again or check the creator name.`);
                 }
             } catch (error) {
-                console.error('Manual creator analysis failed:', error);
+                console.error('Auto creator analysis failed:', error);
                 alert('Failed to analyze creator. Please try again.');
             }
         }
