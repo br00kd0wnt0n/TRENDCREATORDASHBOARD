@@ -522,8 +522,8 @@
                 <h2><i class="fas fa-brain"></i> AI Crossover Insights</h2>
                 <p>Intelligent connections between trends and creators</p>
             </div>
-            <button class="close-button" id="analyzeCreatorBtn" onclick="analyzeCurrentCreator()" title="Analyze current creator" style="margin-right: 8px; background: rgba(255, 255, 255, 0.3);">
-                <i class="fas fa-user-cog"></i>
+            <button class="close-button" id="analyzeBtn" onclick="analyzeCurrentSelection()" title="Analyze current selection" style="margin-right: 8px; background: rgba(255, 255, 255, 0.3);">
+                <i class="fas fa-search-plus" id="analyzeIcon"></i>
             </button>
             <button class="close-button" id="closePanel" title="Minimize panel">
                 <i class="fas fa-times"></i>
@@ -592,8 +592,25 @@
 
             currentTab = tabName;
 
+            // Update analyze button based on current tab
+            updateAnalyzeButton();
+
             // Trigger crossover insights for the new tab
             generateCrossoverInsights();
+        }
+
+        // Update analyze button icon and tooltip based on current tab
+        function updateAnalyzeButton() {
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const analyzeIcon = document.getElementById('analyzeIcon');
+
+            if (currentTab === 'trends') {
+                analyzeBtn.title = 'Analyze manual trend input';
+                analyzeIcon.className = 'fas fa-hashtag';
+            } else if (currentTab === 'creators') {
+                analyzeBtn.title = 'Analyze current creator';
+                analyzeIcon.className = 'fas fa-user-cog';
+            }
         }
 
         // Crossover panel toggle (open/close)
@@ -773,18 +790,26 @@
                     // Step 4: Generate crossover insights
                     console.log('Generating trend-to-creator insights with Strategic Insights:', strategicInsights);
 
+                    // Use manual trend data if provided, otherwise use Strategic Insights
+                    const trendsToAnalyze = (specificItem && specificItem.specificData) ?
+                        specificItem.specificData : strategicInsights.topTrends;
+
+                    console.log('Using trends data:', trendsToAnalyze);
+
                     insights = await fetch('/api/crossover/insights', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             type: 'trend-to-creators',
-                            data: strategicInsights.topTrends, // Use AI-analyzed top trends
+                            data: trendsToAnalyze, // Use manual trend or AI-analyzed top trends
                             context: creatorsContext,
-                            strategicInsights: strategicInsights.strategicInsights, // Include AI narrative
+                            strategicInsights: specificItem?.manualInput ?
+                                { overview: `Manual analysis for trend: ${specificItem.hashtag}` } :
+                                strategicInsights.strategicInsights, // Include AI narrative or manual note
                             marketContext: strategicInsights.marketContext,
                             specific: specificItem ? true : false,
                             tabContext: 'trends',
-                            usingAIIntel: true // Flag to indicate we're using Strategic Insights
+                            usingAIIntel: !specificItem?.manualInput // Flag to indicate we're using Strategic Insights
                         })
                     }).then(r => r.json());
 
@@ -1255,6 +1280,9 @@
             await updateCounts();
             await checkConnectionStatus();
 
+            // Initialize analyze button for current tab
+            updateAnalyzeButton();
+
             // Generate initial insights since panel is open by default
             setTimeout(() => {
                 generateCrossoverInsights();
@@ -1375,6 +1403,65 @@
                 console.log('Cannot access creators iframe - CORS restrictions detected');
             }
         });
+
+        // Auto-detect current selection based on active tab (trend or creator)
+        async function analyzeCurrentSelection() {
+            console.log('Auto-detect: Analyze Current Selection clicked for tab:', currentTab);
+
+            if (currentTab === 'trends') {
+                await analyzeManualTrend();
+            } else if (currentTab === 'creators') {
+                await analyzeCurrentCreator();
+            }
+        }
+
+        // Manual trend input and analysis
+        async function analyzeManualTrend() {
+            console.log('Manual trend analysis triggered');
+
+            // Prompt user for trend input
+            const trendInput = prompt('Enter a trend to analyze (hashtag, keyword, or topic):');
+
+            if (!trendInput || trendInput.trim() === '') {
+                console.log('No trend input provided');
+                return;
+            }
+
+            const trendToAnalyze = trendInput.trim();
+            console.log('Analyzing manual trend:', trendToAnalyze);
+
+            try {
+                // Get all creators for analysis
+                const creatorsData = await fetchCreatorsData();
+                console.log('Available creators for trend analysis:', creatorsData.length);
+
+                if (creatorsData.length === 0) {
+                    alert('No creators available for analysis. Please check the Creator Rolodex connection.');
+                    return;
+                }
+
+                // Create a mock trend object for analysis
+                const mockTrend = {
+                    hashtag: trendToAnalyze.startsWith('#') ? trendToAnalyze : `#${trendToAnalyze}`,
+                    platform: 'manual_input',
+                    content: `Manual trend analysis for: ${trendToAnalyze}`,
+                    engagement_score: 85,
+                    scrapedAt: new Date().toISOString()
+                };
+
+                // Generate insights for this specific trend
+                generateCrossoverInsights({
+                    type: 'trend',
+                    hashtag: mockTrend.hashtag,
+                    specificData: [mockTrend],
+                    manualInput: true
+                });
+
+            } catch (error) {
+                console.error('Manual trend analysis failed:', error);
+                alert('Failed to analyze trend. Please try again.');
+            }
+        }
 
         // Auto-detect current creator from iframe and trigger analysis
         async function analyzeCurrentCreator() {
