@@ -700,14 +700,17 @@
                     const intelStatus = await checkAIIntelStatus();
                     console.log('AI Intel status:', intelStatus);
 
-                    if (!intelStatus.isReady) {
-                        updateProgressStep('intel-status', 'error', `AI Coverage: ${Math.round(intelStatus.aiCoverage * 100)}%`);
+                    // Check if AI analysis is ready (either isReady=true or status=up_to_date)
+                    const aiReady = intelStatus.isReady || intelStatus.status === 'up_to_date' || intelStatus.status === 'ready';
+
+                    if (!aiReady) {
+                        updateProgressStep('intel-status', 'error', `AI Coverage: ${Math.round((intelStatus.aiCoverage || 0) * 100)}%`);
                         crossoverContent.innerHTML = `
                             <div class="insight-card">
                                 <h3><i class="fas fa-clock"></i> AI Intel Briefing Loading</h3>
                                 <p>Waiting for Trend Analysis AI Intel briefing to complete...</p>
                                 <p>Status: ${intelStatus.status}</p>
-                                <p>AI Coverage: ${Math.round(intelStatus.aiCoverage * 100)}%</p>
+                                <p>AI Coverage: ${Math.round((intelStatus.aiCoverage || 0) * 100)}%</p>
                                 <button onclick="triggerAIAnalysis()" style="margin-top: 10px; padding: 8px 16px; background: #EB008B; color: white; border: none; border-radius: 4px; cursor: pointer;">
                                     Trigger AI Analysis
                                 </button>
@@ -716,7 +719,7 @@
                         return;
                     }
 
-                    updateProgressStep('intel-status', 'completed', `${intelStatus.recentTrends} trends analyzed`);
+                    updateProgressStep('intel-status', 'completed', `${intelStatus.recentTrends || 'All'} trends analyzed`);
                     updateProgressStep('strategic-insights', 'in-progress');
 
                     // Step 2: Get Strategic Insights from Trend Analysis AI Intel briefing
@@ -1286,10 +1289,19 @@
 
         creatorsFrame.addEventListener('load', () => {
             console.log('Creators tool loaded');
-            // Try to detect creator selection via URL changes
+            // Try to detect creator selection via URL changes (with rate-limited error logging)
             try {
                 let lastUrl = '';
+                let lastErrorTime = 0;
+                let corsDetected = false;
+
                 const checkUrl = setInterval(() => {
+                    // If CORS was detected, reduce polling frequency
+                    const now = Date.now();
+                    if (corsDetected && now - lastErrorTime < 30000) {
+                        return; // Skip this check if CORS was detected less than 30 seconds ago
+                    }
+
                     try {
                         const url = creatorsFrame.contentWindow.location.href;
                         if (url !== lastUrl) {
@@ -1313,31 +1325,21 @@
                                 }
                             }
                         }
+
+                        // Reset CORS detection if we successfully accessed the URL
+                        corsDetected = false;
                     } catch (urlError) {
-                        console.log('Cannot access creator iframe URL - CORS restriction:', urlError.message);
-                        // URL access blocked by CORS - try alternative detection method
+                        corsDetected = true;
 
-                        // Try to detect creator page changes by monitoring the iframe's title or other accessible properties
-                        try {
-                            const iframeDoc = creatorsFrame.contentDocument || creatorsFrame.contentWindow.document;
-                            if (iframeDoc && iframeDoc.title !== lastCreatorTitle) {
-                                lastCreatorTitle = iframeDoc.title;
-                                console.log('Creator iframe title changed:', iframeDoc.title);
-
-                                // Check if this looks like a creator detail page title
-                                if (iframeDoc.title.includes(' - Creator') || iframeDoc.title.includes('Creator Profile')) {
-                                    console.log('Detected creator detail page via title change');
-                                    // For now, we can't extract the specific creator ID without URL access
-                                    // but we could potentially parse it from the document content
-                                }
-                            }
-                        } catch (docError) {
-                            console.log('Cannot access creator iframe document either - fully blocked by CORS');
+                        // Rate limit error logging - only log once every 30 seconds
+                        if (now - lastErrorTime > 30000) {
+                            console.log('Creator iframe access blocked by CORS - auto-detection disabled for 30s');
+                            lastErrorTime = now;
                         }
                     }
-                }, 1000);
+                }, corsDetected ? 5000 : 2000); // Check every 5s if CORS detected, every 2s otherwise
             } catch (e) {
-                console.log('Cannot access creators iframe URL - CORS restriction');
+                console.log('Cannot access creators iframe - CORS restrictions detected');
             }
         });
 
