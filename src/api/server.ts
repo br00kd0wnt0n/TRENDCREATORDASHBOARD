@@ -335,6 +335,8 @@ app.post('/api/scrape', async (req, res) => {
 
     // Extract platform filter from request body
     const { platforms } = req.body || {};
+    console.log('🎯 API: Received request body:', req.body);
+    console.log('🎯 API: Extracted platforms:', platforms);
     logger.info('Manual scraping initiated via API', { platforms });
 
     // Initialize scraping progress

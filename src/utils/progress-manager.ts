@@ -53,23 +53,35 @@ class ProgressManager {
     return ProgressManager.instance;
   }
 
-  initializeScraping(): void {
+  initializeScraping(sourceNames?: string[]): void {
+    // If no source names provided, use default sources
+    const defaultSources = [
+      'Apify TikTok Hashtag Trends',
+      'Apify Instagram Hashtag Stats',
+      'Trends24 (X/Twitter US)'
+    ];
+
+    const sourcesToInitialize = sourceNames || defaultSources;
+
     this.status = {
       isRunning: true,
       currentSource: null,
       progress: 0,
-      totalSources: 2,
+      totalSources: sourcesToInitialize.length,
       completedSources: 0,
       trends: [],
       errors: [],
       startTime: new Date(),
       lastUpdate: new Date(),
-      sources: [
-        { name: 'Apify TikTok Hashtag Trends', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' },
-        { name: 'Trends24 (X/Twitter US)', status: 'pending', progress: 0, trends: 0, details: 'Waiting to start...' }
-      ]
+      sources: sourcesToInitialize.map(name => ({
+        name,
+        status: 'pending' as const,
+        progress: 0,
+        trends: 0,
+        details: 'Waiting to start...'
+      }))
     };
-    console.log('📊 PROGRESS: Scraping initialized with', this.status.sources.length, 'sources');
+    console.log('📊 PROGRESS: Scraping initialized with', this.status.sources.length, 'sources:', sourcesToInitialize);
   }
 
   updateSourceProgress(sourceName: string, status: 'running' | 'completed' | 'failed', progress: number, trends: number, details?: string, error?: string): void {

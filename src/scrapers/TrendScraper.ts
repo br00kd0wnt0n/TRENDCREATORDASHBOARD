@@ -49,8 +49,8 @@ export class TrendScraper {
   }
 
   async scrapeAllSources(platformFilter?: string[]): Promise<{ trends: any[], report: string }> {
-    console.log('🚀 SCRAPER: scrapeAllSources() called');
-    logger.info('🚀 SCRAPER: scrapeAllSources() called via logger');
+    console.log('🚀 SCRAPER: scrapeAllSources() called with platformFilter:', platformFilter);
+    logger.info('🚀 SCRAPER: scrapeAllSources() called via logger', { platformFilter });
     
     if (this.isRunning) {
       console.log('⚠️ SCRAPER: Already running, returning early');
@@ -73,18 +73,34 @@ export class TrendScraper {
       const sourcePlatformMapping = new Map([
         ['Apify TikTok Hashtag Trends', 'TikTok'],
         ['Apify Instagram Hashtag Stats', 'Instagram'],
-        ['Trends24', 'X (Twitter)']
+        ['Trends24 (X/Twitter US)', 'X (Twitter)']
       ]);
 
       // Filter sources based on platform selection
       let sourcesToScrape = this.sources;
+      console.log('📋 SCRAPER: All available sources:', this.sources.map(s => s.name));
+      console.log('🗺️ SCRAPER: Platform mapping:', Array.from(sourcePlatformMapping.entries()));
+
       if (platformFilter && platformFilter.length > 0) {
+        console.log('🎯 SCRAPER: Applying platform filter:', platformFilter);
         sourcesToScrape = this.sources.filter(source => {
           const sourcePlatform = sourcePlatformMapping.get(source.name);
-          return sourcePlatform && platformFilter.includes(sourcePlatform);
+          const isIncluded = sourcePlatform && platformFilter.includes(sourcePlatform);
+          console.log(`   - Source "${source.name}" -> Platform "${sourcePlatform}" -> Included: ${isIncluded}`);
+          return isIncluded;
         });
+        console.log(`✅ SCRAPER: Filtered to ${sourcesToScrape.length}/${this.sources.length} sources:`, sourcesToScrape.map(s => s.name));
         logger.info(`🎯 Platform filter applied: [${platformFilter.join(', ')}] - scraping ${sourcesToScrape.length}/${this.sources.length} sources`);
+      } else {
+        console.log('🌐 SCRAPER: No platform filter - scraping all sources');
       }
+
+      // Update stats to reflect filtered sources
+      scrapingStats.totalSources = sourcesToScrape.length;
+
+      // Initialize progress manager with filtered sources
+      const sourceNames = sourcesToScrape.map(source => source.name);
+      progressManager.initializeScraping(sourceNames);
 
       logger.info(`🚀 Starting comprehensive trend scraping across ${sourcesToScrape.length} sources...`);
 

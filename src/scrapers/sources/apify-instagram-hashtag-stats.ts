@@ -20,34 +20,35 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
         return [];
       }
 
-      // Popular seed hashtags across different categories to discover trending related hashtags
+      // Content-focused seed hashtags to discover actual trends (avoiding meta platform hashtags)
       const seedHashtags = [
-        // General popular categories
-        'instagram', 'viral', 'trending', 'explore', 'fyp',
-        // Lifestyle & Fashion
-        'fashion', 'style', 'ootd', 'beauty', 'lifestyle',
-        // Entertainment & Culture
-        'music', 'art', 'photography', 'reels', 'video',
-        // Health & Wellness
-        'fitness', 'wellness', 'health', 'mindfulness',
-        // Technology & Business
-        'tech', 'ai', 'business', 'entrepreneur',
-        // Food & Travel
-        'food', 'travel', 'foodie', 'vacation'
+        // Current events & culture
+        'christmas2024', 'newyear2025', 'blackfriday', 'thanksgiving', 'halloween',
+        // Entertainment & media
+        'netflix', 'disney', 'marvel', 'anime', 'kpop', 'taylor swift', 'bts',
+        // Technology & innovation
+        'ai', 'chatgpt', 'iphone15', 'tesla', 'crypto', 'nft',
+        // Lifestyle & wellness
+        'meditation', 'yoga', 'vegan', 'skincare', 'mentalhealth',
+        // Food & culture
+        'korean', 'italian', 'mexican', 'sushi', 'pizza', 'coffee',
+        // Sports & fitness
+        'nfl', 'basketball', 'soccer', 'olympics', 'gym', 'running',
+        // Fashion & beauty
+        'vintage', 'sustainable', 'makeup', 'nails', 'streetwear'
       ];
 
-      // Start the Instagram hashtag stats scraper
+      // Start the Instagram hashtag stats scraper with correct input format
+      const inputData = {
+        hashtags: seedHashtags.slice(0, 5), // Use first 5 seed hashtags (fewer for free tier)
+        resultsLimit: 5 // Small limit for trending discovery
+      };
+
+      console.log('🎯 APIFY-INSTAGRAM-STATS: Sending input:', JSON.stringify(inputData, null, 2));
+
       const runResponse = await axios.post(
         'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats/runs',
-        {
-          input: {
-            hashtags: seedHashtags.slice(0, 10), // Use first 10 seed hashtags
-            maxResults: 100,
-            includeRelatedHashtags: true,
-            includeTopPosts: true,
-            includeRecentPosts: true
-          }
-        },
+        inputData,
         {
           headers: {
             'Authorization': `Bearer ${APIFY_TOKEN}`,
@@ -96,112 +97,187 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
       const hashtagStatsResults = resultsResponse.data;
       console.log(`📊 APIFY-INSTAGRAM-STATS: Retrieved ${hashtagStatsResults.length} hashtag stat items from Apify`);
 
-      // Transform to TrendData format - focus on related hashtags that are trending
+      // Transform Instagram hashtag stats to TrendData format
       const trends: TrendData[] = [];
       const uniqueHashtags = new Set<string>();
 
+      console.log(`📊 APIFY-INSTAGRAM-STATS: Processing ${hashtagStatsResults.length} hashtag stat entries from Instagram`);
+
       hashtagStatsResults.forEach((item: any) => {
-        // Extract related hashtags from each seed hashtag result
-        if (item.relatedHashtags && Array.isArray(item.relatedHashtags)) {
-          item.relatedHashtags.forEach((relatedTag: any) => {
-            let hashtag = '';
-            let popularity = 'Trending';
-            let category = 'General';
+        console.log(`🔍 APIFY-INSTAGRAM-STATS: Processing hashtag result:`, {
+          name: item.name,
+          postsCount: item.postsCount,
+          hasFrequent: !!item.frequent,
+          hasRelated: !!item.related
+        });
 
-            // Extract hashtag
-            if (relatedTag.hashtag) {
-              hashtag = relatedTag.hashtag.startsWith('#') ? relatedTag.hashtag : `#${relatedTag.hashtag}`;
-            } else if (relatedTag.name) {
-              hashtag = relatedTag.name.startsWith('#') ? relatedTag.name : `#${relatedTag.name}`;
-            } else if (relatedTag.tag) {
-              hashtag = relatedTag.tag.startsWith('#') ? relatedTag.tag : `#${relatedTag.tag}`;
-            }
+        // Process frequent hashtags (most popular related hashtags)
+        if (item.frequent && Array.isArray(item.frequent)) {
+          item.frequent.forEach((hashtagData: any) => {
+            if (hashtagData.hash && hashtagData.info) {
+              const hashtag = hashtagData.hash.startsWith('#') ? hashtagData.hash : `#${hashtagData.hash}`;
 
-            // Skip if already processed or invalid
-            if (!hashtag || hashtag.length <= 1 || uniqueHashtags.has(hashtag)) {
-              return;
-            }
-            uniqueHashtags.add(hashtag);
+              // Filter out generic/platform hashtags
+              const genericHashtags = [
+                'fyp', 'bhfyp', 'fypシ', 'fypage', 'fypp', 'fypchallenge', 'fyppage', 'fyppppppppppppppppppppppp',
+                'viral', 'trending', 'explore', 'instagram', 'insta', 'instadaily', 'instagood', 'instalike',
+                'follow', 'followme', 'like4like', 'likeforlikes', 'comment', 'comments', 'reels', 'reel',
+                'newpost', 'post', 'posts', 'photography', 'photo', 'pic', 'picture', 'selfie', 'me', 'love',
+                'happy', 'fun', 'life', 'style', 'fashion', 'ootd', 'mood', 'vibes', 'blessed', 'grateful'
+              ];
 
-            // Extract popularity metrics
-            if (relatedTag.postsCount || relatedTag.posts_count || relatedTag.frequency) {
-              const count = parseInt(relatedTag.postsCount || relatedTag.posts_count || relatedTag.frequency);
-              if (count > 10000000) {
-                popularity = `${(count / 1000000).toFixed(1)}M posts`;
-              } else if (count > 1000000) {
-                popularity = `${(count / 1000000).toFixed(1)}M posts`;
-              } else if (count > 1000) {
-                popularity = `${Math.round(count / 1000)}K posts`;
-              } else {
-                popularity = `${count} posts`;
+              const hashtagLower = hashtag.toLowerCase().replace('#', '');
+              const isGeneric = genericHashtags.some(generic =>
+                hashtagLower === generic ||
+                hashtagLower.includes('fyp') ||
+                hashtagLower.includes('viral') ||
+                hashtagLower.includes('follow') ||
+                hashtagLower.includes('like')
+              );
+
+              if (!uniqueHashtags.has(hashtag) && !isGeneric) {
+                uniqueHashtags.add(hashtag);
+
+                let category = 'General';
+                const hashtagLower = hashtag.toLowerCase();
+
+                // Categorize hashtag
+                if (hashtagLower.includes('fashion') || hashtagLower.includes('style') || hashtagLower.includes('outfit') || hashtagLower.includes('ootd')) {
+                  category = 'Fashion';
+                } else if (hashtagLower.includes('beauty') || hashtagLower.includes('makeup') || hashtagLower.includes('skincare')) {
+                  category = 'Beauty & Personal Care';
+                } else if (hashtagLower.includes('fitness') || hashtagLower.includes('workout') || hashtagLower.includes('gym') || hashtagLower.includes('health')) {
+                  category = 'Health & Fitness';
+                } else if (hashtagLower.includes('food') || hashtagLower.includes('recipe') || hashtagLower.includes('cooking') || hashtagLower.includes('foodie')) {
+                  category = 'Food & Beverage';
+                } else if (hashtagLower.includes('travel') || hashtagLower.includes('vacation') || hashtagLower.includes('wanderlust')) {
+                  category = 'Travel';
+                } else if (hashtagLower.includes('art') || hashtagLower.includes('artist') || hashtagLower.includes('creative') || hashtagLower.includes('design')) {
+                  category = 'Arts & Crafts';
+                } else if (hashtagLower.includes('music') || hashtagLower.includes('song') || hashtagLower.includes('band')) {
+                  category = 'Music';
+                } else if (hashtagLower.includes('tech') || hashtagLower.includes('ai') || hashtagLower.includes('digital')) {
+                  category = 'Technology';
+                } else if (hashtagLower.includes('business') || hashtagLower.includes('entrepreneur') || hashtagLower.includes('startup')) {
+                  category = 'Business';
+                } else if (hashtagLower.includes('lifestyle') || hashtagLower.includes('life') || hashtagLower.includes('daily')) {
+                  category = 'Lifestyle';
+                }
+
+                trends.push({
+                  hashtag: hashtag,
+                  popularity: hashtagData.info || 'Trending',
+                  category: category,
+                  platform: 'Instagram',
+                  region: 'Global',
+                  timestamp: new Date(),
+                  metadata: {
+                    source_url: 'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats',
+                    scraped_from: 'Apify Instagram Hashtag Stats API',
+                    extraction_method: 'apify_instagram_hashtag_stats',
+                    apify_run_id: runId,
+                    related_to: item.name,
+                    frequency_type: 'frequent',
+                    original_data: hashtagData
+                  }
+                });
               }
-            } else if (relatedTag.score || relatedTag.popularity) {
-              const score = parseFloat(relatedTag.score || relatedTag.popularity || '0');
-              popularity = `${(score * 100).toFixed(1)}% trending`;
             }
-
-            // Categorize based on hashtag content
-            const hashtagLower = hashtag.toLowerCase();
-            if (hashtagLower.includes('fashion') || hashtagLower.includes('style') || hashtagLower.includes('outfit') || hashtagLower.includes('ootd')) {
-              category = 'Fashion';
-            } else if (hashtagLower.includes('beauty') || hashtagLower.includes('makeup') || hashtagLower.includes('skincare')) {
-              category = 'Beauty & Personal Care';
-            } else if (hashtagLower.includes('fitness') || hashtagLower.includes('workout') || hashtagLower.includes('gym') || hashtagLower.includes('health')) {
-              category = 'Health & Fitness';
-            } else if (hashtagLower.includes('food') || hashtagLower.includes('recipe') || hashtagLower.includes('cooking') || hashtagLower.includes('foodie')) {
-              category = 'Food & Beverage';
-            } else if (hashtagLower.includes('travel') || hashtagLower.includes('vacation') || hashtagLower.includes('wanderlust')) {
-              category = 'Travel';
-            } else if (hashtagLower.includes('art') || hashtagLower.includes('artist') || hashtagLower.includes('creative') || hashtagLower.includes('design')) {
-              category = 'Arts & Crafts';
-            } else if (hashtagLower.includes('music') || hashtagLower.includes('song') || hashtagLower.includes('band')) {
-              category = 'Music';
-            } else if (hashtagLower.includes('tech') || hashtagLower.includes('ai') || hashtagLower.includes('digital')) {
-              category = 'Technology';
-            } else if (hashtagLower.includes('business') || hashtagLower.includes('entrepreneur') || hashtagLower.includes('startup')) {
-              category = 'Business';
-            } else if (hashtagLower.includes('lifestyle') || hashtagLower.includes('life') || hashtagLower.includes('daily')) {
-              category = 'Lifestyle';
-            }
-
-            trends.push({
-              hashtag: hashtag,
-              popularity: popularity,
-              category: category,
-              platform: 'Instagram',
-              region: 'Global',
-              timestamp: new Date(),
-              metadata: {
-                source_url: 'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats',
-                scraped_from: 'Apify Instagram Hashtag Stats API',
-                extraction_method: 'apify_instagram_hashtag_stats',
-                apify_run_id: runId,
-                seed_hashtag: item.hashtag || item.originalHashtag,
-                frequency: relatedTag.frequency || relatedTag.score,
-                posts_count: relatedTag.postsCount || relatedTag.posts_count,
-                original_data: relatedTag
-              }
-            });
           });
         }
 
-        // Also include the main hashtag if it has good stats
-        if (item.hashtag && item.postsCount) {
-          const hashtag = item.hashtag.startsWith('#') ? item.hashtag : `#${item.hashtag}`;
+        // Process related hashtags (semantically related trending hashtags)
+        if (item.related && Array.isArray(item.related)) {
+          item.related.slice(0, 20).forEach((hashtagData: any) => { // Limit to top 20 related
+            if (hashtagData.hash && hashtagData.info) {
+              const hashtag = hashtagData.hash.startsWith('#') ? hashtagData.hash : `#${hashtagData.hash}`;
+
+              // Same generic filter for related hashtags
+              const genericHashtags = [
+                'fyp', 'bhfyp', 'fypシ', 'fypage', 'fypp', 'fypchallenge', 'fyppage', 'fyppppppppppppppppppppppp',
+                'viral', 'trending', 'explore', 'instagram', 'insta', 'instadaily', 'instagood', 'instalike',
+                'follow', 'followme', 'like4like', 'likeforlikes', 'comment', 'comments', 'reels', 'reel',
+                'newpost', 'post', 'posts', 'photography', 'photo', 'pic', 'picture', 'selfie', 'me', 'love',
+                'happy', 'fun', 'life', 'style', 'fashion', 'ootd', 'mood', 'vibes', 'blessed', 'grateful'
+              ];
+
+              const hashtagLower = hashtag.toLowerCase().replace('#', '');
+              const isGeneric = genericHashtags.some(generic =>
+                hashtagLower === generic ||
+                hashtagLower.includes('fyp') ||
+                hashtagLower.includes('viral') ||
+                hashtagLower.includes('follow') ||
+                hashtagLower.includes('like')
+              );
+
+              if (!uniqueHashtags.has(hashtag) && !isGeneric) {
+                uniqueHashtags.add(hashtag);
+
+                let category = 'General';
+                const hashtagLower = hashtag.toLowerCase();
+
+                // Categorize hashtag (same logic as above)
+                if (hashtagLower.includes('fashion') || hashtagLower.includes('style') || hashtagLower.includes('outfit') || hashtagLower.includes('ootd')) {
+                  category = 'Fashion';
+                } else if (hashtagLower.includes('beauty') || hashtagLower.includes('makeup') || hashtagLower.includes('skincare')) {
+                  category = 'Beauty & Personal Care';
+                } else if (hashtagLower.includes('fitness') || hashtagLower.includes('workout') || hashtagLower.includes('gym') || hashtagLower.includes('health')) {
+                  category = 'Health & Fitness';
+                } else if (hashtagLower.includes('food') || hashtagLower.includes('recipe') || hashtagLower.includes('cooking') || hashtagLower.includes('foodie')) {
+                  category = 'Food & Beverage';
+                } else if (hashtagLower.includes('travel') || hashtagLower.includes('vacation') || hashtagLower.includes('wanderlust')) {
+                  category = 'Travel';
+                } else if (hashtagLower.includes('art') || hashtagLower.includes('artist') || hashtagLower.includes('creative') || hashtagLower.includes('design')) {
+                  category = 'Arts & Crafts';
+                } else if (hashtagLower.includes('music') || hashtagLower.includes('song') || hashtagLower.includes('band')) {
+                  category = 'Music';
+                } else if (hashtagLower.includes('tech') || hashtagLower.includes('ai') || hashtagLower.includes('digital')) {
+                  category = 'Technology';
+                } else if (hashtagLower.includes('business') || hashtagLower.includes('entrepreneur') || hashtagLower.includes('startup')) {
+                  category = 'Business';
+                } else if (hashtagLower.includes('lifestyle') || hashtagLower.includes('life') || hashtagLower.includes('daily')) {
+                  category = 'Lifestyle';
+                }
+
+                trends.push({
+                  hashtag: hashtag,
+                  popularity: hashtagData.info || 'Related trending',
+                  category: category,
+                  platform: 'Instagram',
+                  region: 'Global',
+                  timestamp: new Date(),
+                  metadata: {
+                    source_url: 'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats',
+                    scraped_from: 'Apify Instagram Hashtag Stats API',
+                    extraction_method: 'apify_instagram_hashtag_stats',
+                    apify_run_id: runId,
+                    related_to: item.name,
+                    frequency_type: 'related',
+                    original_data: hashtagData
+                  }
+                });
+              }
+            }
+          });
+        }
+
+        // Also include the main hashtag if it has post count data
+        if (item.name && item.postsCount) {
+          const hashtag = item.name.startsWith('#') ? item.name : `#${item.name}`;
 
           if (!uniqueHashtags.has(hashtag)) {
             uniqueHashtags.add(hashtag);
 
-            const count = parseInt(item.postsCount);
+            const postsCount = parseInt(item.postsCount);
             let popularity = 'Popular';
-            if (count > 10000000) {
-              popularity = `${(count / 1000000).toFixed(1)}M posts`;
-            } else if (count > 1000000) {
-              popularity = `${(count / 1000000).toFixed(1)}M posts`;
-            } else if (count > 1000) {
-              popularity = `${Math.round(count / 1000)}K posts`;
+            if (postsCount > 1000000000) {
+              popularity = `${(postsCount / 1000000000).toFixed(1)}B posts`;
+            } else if (postsCount > 1000000) {
+              popularity = `${(postsCount / 1000000).toFixed(1)}M posts`;
+            } else if (postsCount > 1000) {
+              popularity = `${Math.round(postsCount / 1000)}K posts`;
             } else {
-              popularity = `${count} posts`;
+              popularity = `${postsCount} posts`;
             }
 
             trends.push({
@@ -216,8 +292,9 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
                 scraped_from: 'Apify Instagram Hashtag Stats API',
                 extraction_method: 'apify_instagram_hashtag_stats',
                 apify_run_id: runId,
-                posts_count: count,
+                posts_count: postsCount,
                 is_seed_hashtag: true,
+                posts_per_day: item.postsPerDay,
                 original_data: item
               }
             });
@@ -225,37 +302,25 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
         }
       });
 
-      // Sort by popularity (extract numbers from popularity strings) and take top trends
-      const sortedTrends = trends.sort((a, b) => {
-        const getPopularityScore = (pop: string): number => {
-          if (pop.includes('M posts')) {
-            return parseFloat(pop.split('M')[0]) * 1000000;
-          } else if (pop.includes('K posts')) {
-            return parseFloat(pop.split('K')[0]) * 1000;
-          } else if (pop.includes('posts')) {
-            return parseInt(pop.split(' posts')[0]) || 0;
-          } else if (pop.includes('% trending')) {
-            return parseFloat(pop.split('%')[0]) * 1000; // Boost trending score
-          }
-          return 0;
-        };
+      console.log(`✅ APIFY-INSTAGRAM-STATS: Extracted ${trends.length} trending Instagram hashtags from posts analysis`);
+      logger.info(`Extracted ${trends.length} trending Instagram hashtags from posts analysis`);
 
-        return getPopularityScore(b.popularity || '') - getPopularityScore(a.popularity || '');
-      });
-
-      const finalTrends = sortedTrends.slice(0, 50); // Top 50 trending hashtags
-
-      console.log(`✅ APIFY-INSTAGRAM-STATS: Extracted ${finalTrends.length} trending Instagram hashtags from related hashtag analysis`);
-      logger.info(`Extracted ${finalTrends.length} trending Instagram hashtags from hashtag stats`);
-
-      if (finalTrends.length > 0) {
-        console.log('📋 APIFY-INSTAGRAM-STATS: Top trending hashtags:', finalTrends.slice(0, 10).map(t => `${t.hashtag} (${t.popularity})`));
+      if (trends.length > 0) {
+        console.log('📋 APIFY-INSTAGRAM-STATS: Top trending hashtags:', trends.slice(0, 10).map(t => `${t.hashtag} (${t.popularity})`));
       }
 
-      return finalTrends;
+      return trends;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ APIFY-INSTAGRAM-STATS: Error:', error);
+
+      // Log detailed error information for debugging
+      if (error.response) {
+        console.error('❌ APIFY-INSTAGRAM-STATS: Response status:', error.response.status);
+        console.error('❌ APIFY-INSTAGRAM-STATS: Response data:', JSON.stringify(error.response.data, null, 2));
+        console.error('❌ APIFY-INSTAGRAM-STATS: Request URL:', 'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats/runs');
+      }
+
       logger.error('Apify Instagram hashtag stats extraction failed:', error);
       return [];
     }
