@@ -911,7 +911,7 @@
                         <p>AI-powered creator recommendations for this specific trend</p>
                     </div>
                 `;
-            } else if (strategicInsights) {
+            } else if (strategicInsights && !specificItem?.manualInput) {
                 analysisHeader = `
                     <div class="insight-card" style="background: linear-gradient(135deg, #31BDBF, #EB008B); color: white;">
                         <h3><i class="fas fa-brain"></i> Using AI Intel Briefing</h3>
@@ -923,8 +923,8 @@
 
             let html = analysisHeader;
 
-            // Show Strategic Insights if available (from AI Intel briefing)
-            if (strategicInsights && strategicInsights.strategicInsights) {
+            // Show Strategic Insights if available (from AI Intel briefing) and NOT manual input
+            if (strategicInsights && strategicInsights.strategicInsights && !specificItem?.manualInput) {
                 html += `
                     <div class="insight-card">
                         <h3><i class="fas fa-chart-line"></i> Strategic Insights from Trend Analysis</h3>
@@ -971,7 +971,8 @@
                 html += '</ul></div>';
             }
 
-            if (insights.marketingOpportunities && insights.marketingOpportunities.length > 0) {
+            // Only show Marketing Opportunities for non-manual inputs
+            if (insights.marketingOpportunities && insights.marketingOpportunities.length > 0 && !specificItem?.manualInput) {
                 html += `
                     <div class="insight-card">
                         <h3><i class="fas fa-rocket"></i> Marketing Opportunities</h3>
