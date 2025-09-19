@@ -1030,35 +1030,6 @@
                     
                     // Create the narrative content HTML
                     narrativeContent.innerHTML = `
-                        <div class="overview-section">
-                            <h3><i class="fas fa-chart-line"></i> Executive Overview</h3>
-                            <p class="overview-text">${narrative.overview || 'Analysis in progress...'}</p>
-                        </div>
-                        
-                        <div class="insights-grid">
-                            <div class="insight-card">
-                                <h4><i class="fas fa-database"></i> Total Trends</h4>
-                                <p class="total-trends-insight">${narrative.totalTrendsInsight || 'Processing trend data...'}</p>
-                            </div>
-                            
-                            <div class="insight-card">
-                                <h4><i class="fas fa-clock"></i> Recent Activity</h4>
-                                <p class="recent-activity-insight">${narrative.recentActivityInsight || 'Analyzing recent activity...'}</p>
-                            </div>
-                            
-                            <div class="insight-card">
-                                <h4><i class="fas fa-shield-alt"></i> High Confidence</h4>
-                                <p class="high-confidence-explanation">${narrative.highConfidenceExplanation || 'Calculating confidence metrics...'}</p>
-                            </div>
-                        </div>
-                        
-                        <div class="key-insights">
-                            <h3><i class="fas fa-lightbulb"></i> Strategic Insights</h3>
-                            <ul>
-                                ${narrative.keyInsights ? narrative.keyInsights.map(insight => `<li>${insight}</li>`).join('') : '<li>Generating insights...</li>'}
-                            </ul>
-                        </div>
-                        
                         <div class="top-trends-section">
                             <div class="top-trends-header">
                                 <i class="fas fa-fire"></i>
@@ -1101,7 +1072,36 @@
                                 </tbody>
                             </table>
                         </div>
-                        
+
+                        <div class="key-insights">
+                            <h3><i class="fas fa-lightbulb"></i> Strategic Insights</h3>
+                            <ul>
+                                ${narrative.keyInsights ? narrative.keyInsights.map(insight => `<li>${insight}</li>`).join('') : '<li>Generating insights...</li>'}
+                            </ul>
+                        </div>
+
+                        <div class="overview-section">
+                            <h3><i class="fas fa-chart-line"></i> Executive Overview</h3>
+                            <p class="overview-text">${narrative.overview || 'Analysis in progress...'}</p>
+                        </div>
+
+                        <div class="insights-grid">
+                            <div class="insight-card">
+                                <h4><i class="fas fa-database"></i> Total Trends</h4>
+                                <p class="total-trends-insight">${narrative.totalTrendsInsight || 'Processing trend data...'}</p>
+                            </div>
+
+                            <div class="insight-card">
+                                <h4><i class="fas fa-clock"></i> Recent Activity</h4>
+                                <p class="recent-activity-insight">${narrative.recentActivityInsight || 'Analyzing recent activity...'}</p>
+                            </div>
+
+                            <div class="insight-card">
+                                <h4><i class="fas fa-shield-alt"></i> High Confidence</h4>
+                                <p class="high-confidence-explanation">${narrative.highConfidenceExplanation || 'Calculating confidence metrics...'}</p>
+                            </div>
+                        </div>
+
                         <div class="chat-section">
                             <div class="chat-header">
                                 <i class="fas fa-comments"></i>
