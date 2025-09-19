@@ -48,7 +48,7 @@ export class TrendScraper {
     }
   }
 
-  async scrapeAllSources(): Promise<{ trends: any[], report: string }> {
+  async scrapeAllSources(platformFilter?: string[]): Promise<{ trends: any[], report: string }> {
     console.log('🚀 SCRAPER: scrapeAllSources() called');
     logger.info('🚀 SCRAPER: scrapeAllSources() called via logger');
     
@@ -61,7 +61,7 @@ export class TrendScraper {
     console.log('✅ SCRAPER: Starting scraping process');
     this.isRunning = true;
     const allTrends: any[] = [];
-    const scrapingStats = {
+    let scrapingStats = {
       totalSources: this.sources.length,
       completedSources: 0,
       successfulSources: 0,
@@ -69,11 +69,28 @@ export class TrendScraper {
     };
 
     try {
-      logger.info(`🚀 Starting comprehensive trend scraping across ${this.sources.length} sources...`);
+      // Map sources to their platforms for filtering
+      const sourcePlatformMapping = new Map([
+        ['Apify TikTok Hashtags', 'TikTok'],
+        ['Apify Instagram Hashtag Stats', 'Instagram'],
+        ['Trends24', 'X (Twitter)']
+      ]);
 
-      for (let i = 0; i < this.sources.length; i++) {
-        const source = this.sources[i];
-        const sourceProgress = `[${i + 1}/${this.sources.length}]`;
+      // Filter sources based on platform selection
+      let sourcesToScrape = this.sources;
+      if (platformFilter && platformFilter.length > 0) {
+        sourcesToScrape = this.sources.filter(source => {
+          const sourcePlatform = sourcePlatformMapping.get(source.name);
+          return sourcePlatform && platformFilter.includes(sourcePlatform);
+        });
+        logger.info(`🎯 Platform filter applied: [${platformFilter.join(', ')}] - scraping ${sourcesToScrape.length}/${this.sources.length} sources`);
+      }
+
+      logger.info(`🚀 Starting comprehensive trend scraping across ${sourcesToScrape.length} sources...`);
+
+      for (let i = 0; i < sourcesToScrape.length; i++) {
+        const source = sourcesToScrape[i];
+        const sourceProgress = `[${i + 1}/${sourcesToScrape.length}]`;
         
         try {
           logger.info(`${sourceProgress} 🎯 Starting scrape: ${source.name}`);

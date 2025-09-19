@@ -840,7 +840,7 @@
                 <select id="platform">
                     <option value="">All Platforms</option>
                     <option value="TikTok">TikTok</option>
-                    <option value="Pinterest">Pinterest</option>
+                    <option value="Instagram">Instagram</option>
                     <option value="X (Twitter)">X (Twitter)</option>
                 </select>
             </div>
@@ -980,8 +980,8 @@
                                 <th style="padding: 12px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Time</th>
                                 <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Total</th>
                                 <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fab fa-tiktok"></i></th>
-                                <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fab fa-pinterest"></i></th>
-                                <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fab fa-twitter"></i></th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fab fa-instagram"></i></th>
+                                <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;"><i class="fab fa-x-twitter"></i></th>
                                 <th style="padding: 12px; text-align: center; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Confidence</th>
                             </tr>
                         </thead>
@@ -1360,8 +1360,9 @@
         function getPlatformIcon(platform) {
             const icons = {
                 'TikTok': 'tiktok',
-                'Pinterest': 'pinterest',
-                'Twitter/X': 'twitter'
+                'Instagram': 'instagram',
+                'Twitter/X': 'x-twitter',
+                'X (Twitter)': 'x-twitter'
             };
             return icons[platform] || 'globe';
         }
