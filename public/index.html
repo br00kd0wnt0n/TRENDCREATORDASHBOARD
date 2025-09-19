@@ -717,7 +717,7 @@
                                 <p>Status: ${intelStatus.status}</p>
                                 <p>Recent trends: ${intelStatus.recentTrends}</p>
                                 <div style="margin-top: 15px;">
-                                    <button onclick="window.open('${TRENDS_API_URL || 'http://localhost:30003'}/api/scrape/trigger', '_blank')" style="margin-right: 10px; padding: 8px 16px; background: #EB008B; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    <button onclick="window.open('http://localhost:30003/api/scrape/trigger', '_blank')" style="margin-right: 10px; padding: 8px 16px; background: #EB008B; color: white; border: none; border-radius: 4px; cursor: pointer;">
                                         Trigger Scrape
                                     </button>
                                     <button onclick="generateCrossoverInsights()" style="padding: 8px 16px; background: #31BDBF; color: white; border: none; border-radius: 4px; cursor: pointer;">
@@ -1196,7 +1196,7 @@
             try {
                 const [trendsResponse, creatorsResponse] = await Promise.all([
                     fetch('/api/trends/stats'),
-                    fetch('/api/creators/creators') // Remove limit to get all creators for accurate count
+                    fetch('/api/creators/creators?limit=100') // Get all creators for accurate count (increase limit to ensure we get all)
                 ]);
 
                 const trendsData = await trendsResponse.json();
