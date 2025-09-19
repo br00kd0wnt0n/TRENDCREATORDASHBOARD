@@ -321,31 +321,33 @@ app.get('/api/trends/search', async (_req, res) => {
 
 // Progress tracking is now handled by the ProgressManager singleton
 
-app.post('/api/scrape', async (_req, res) => {
+app.post('/api/scrape', async (req, res) => {
   try {
     const currentStatus = progressManager.getStatus();
     if (currentStatus.isRunning) {
-      res.json({ 
-        success: false, 
+      res.json({
+        success: false,
         message: 'Scraping already in progress',
         status: currentStatus
       });
       return;
     }
 
-    logger.info('Manual scraping initiated via API');
-    
+    // Extract platform filter from request body
+    const { platforms } = req.body || {};
+    logger.info('Manual scraping initiated via API', { platforms });
+
     // Initialize scraping progress
     progressManager.initializeScraping();
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: 'Scraping started successfully',
       status: progressManager.getStatus()
     });
 
-    // Run scraping asynchronously
-    const result = await scraper.scrapeAllSources();
+    // Run scraping asynchronously with platform filter
+    const result = await scraper.scrapeAllSources(platforms);
     
     // Update final status
     progressManager.completeScraping(result.trends);

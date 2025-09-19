@@ -43,13 +43,13 @@ export const ApifyTikTokHashtagSource: TrendSource = {
       const runId = runResponse.data.data.id;
       console.log(`🚀 APIFY-HASHTAGS: Started hashtag run ${runId}`);
 
-      // Poll for completion
+      // Poll for completion with more conservative timing
       let runStatus = 'RUNNING';
       let attempts = 0;
-      const maxAttempts = 20; // 6-7 minutes max wait
+      const maxAttempts = 15; // 7-8 minutes max wait
 
       while (runStatus === 'RUNNING' && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 20000)); // Wait 20 seconds
+        await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds (more conservative)
 
         const statusResponse = await axios.get(
           `https://api.apify.com/v2/actor-runs/${runId}`,

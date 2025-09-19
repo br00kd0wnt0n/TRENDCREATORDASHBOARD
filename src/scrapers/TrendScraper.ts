@@ -71,7 +71,7 @@ export class TrendScraper {
     try {
       // Map sources to their platforms for filtering
       const sourcePlatformMapping = new Map([
-        ['Apify TikTok Hashtags', 'TikTok'],
+        ['Apify TikTok Hashtag Trends', 'TikTok'],
         ['Apify Instagram Hashtag Stats', 'Instagram'],
         ['Trends24', 'X (Twitter)']
       ]);

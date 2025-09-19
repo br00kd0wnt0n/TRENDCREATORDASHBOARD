@@ -1449,10 +1449,21 @@
                 button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing...';
                 button.disabled = true;
 
+                // Get selected platform from dropdown
+                const platformSelect = document.getElementById('platform');
+                const selectedPlatform = platformSelect.value;
+                const platforms = selectedPlatform ? [selectedPlatform] : [];
+
                 // Create progress display
                 showProgressModal();
 
-                const response = await fetch('/api/scrape', { method: 'POST' });
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ platforms })
+                });
                 const data = await response.json();
                 
                 if (data.success) {
