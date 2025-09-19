@@ -569,10 +569,11 @@ app.get('/api/trending/top', async (_req, res) => {
 app.get('/api/intel/status', async (_req, res) => {
   try {
     // Check if we have recent trends and AI analysis
+    // Extended to 7 days to be more flexible with "recent" definition
     const recentTrends = await Trend.count({
       where: {
         scrapedAt: {
-          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days instead of 24 hours
         }
       }
     });
@@ -580,13 +581,16 @@ app.get('/api/intel/status', async (_req, res) => {
     const trendsWithAI = await Trend.count({
       where: {
         scrapedAt: {
-          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days instead of 24 hours
         },
         aiInsights: {
           [Op.ne]: ''
         }
       }
     });
+
+    // Also get total trends as fallback info
+    const totalTrends = await Trend.count();
 
     const isReady = recentTrends > 0 && trendsWithAI > 0;
     const lastUpdate = await Trend.findOne({
@@ -601,10 +605,11 @@ app.get('/api/intel/status', async (_req, res) => {
         isReady,
         isLoading: false, // We'll implement real-time loading status later
         recentTrends,
+        totalTrends,
         trendsWithAI,
         aiCoverage: recentTrends > 0 ? (trendsWithAI / recentTrends) : 0,
         lastUpdate: lastUpdate?.scrapedAt,
-        status: isReady ? 'ready' : 'insufficient_data'
+        status: isReady ? 'ready' : (totalTrends > 0 ? 'trends_need_ai' : 'insufficient_data')
       }
     });
   } catch (error) {
