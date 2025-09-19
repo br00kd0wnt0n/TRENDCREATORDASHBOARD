@@ -5,6 +5,7 @@ import { TrendSource, TrendData } from '../types';
 // import { PinterestSource } from './sources/pinterest'; // Replaced with Apify version
 import { ApifyTikTokHashtagSource } from './sources/apify-tiktok-hashtags';
 // import { ApifyInstagramSource } from './sources/apify-instagram';
+import { ApifyInstagramHashtagStatsSource } from './sources/apify-instagram-hashtag-stats';
 // import { ApifyPinterestSource } from './sources/apify-pinterest';
 // import { TwitterSource } from './sources/twitter';
 import { Trends24Source } from './sources/trends24';
@@ -27,7 +28,8 @@ export class TrendScraper {
     this.aiService = new AIEnrichmentService();
     this.sources = [
       ApifyTikTokHashtagSource, // Use Apify for better TikTok hashtag data (WORKING ✅)
-      // ApifyInstagramSource, // TODO: Fix data extraction - returns data but no hashtags extracted
+      ApifyInstagramHashtagStatsSource, // Use hashtag stats with seed hashtags to discover trending hashtags
+      // ApifyInstagramSource, // Testing easyapi/instagram-hashtag-scraper ($19.99/month) - REPLACED with stats version
       // ApifyPinterestSource, // TODO: Fix input configuration - still getting 400 errors
       // TikTokSource, // DISABLED: Was overwriting good Apify data with 3 generic trends
       Trends24Source // Using Trends24 instead of direct X.com due to auth requirements
