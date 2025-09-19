@@ -700,10 +700,38 @@
                     const intelStatus = await checkAIIntelStatus();
                     console.log('AI Intel status:', intelStatus);
 
-                    // Check if AI analysis is ready (either isReady=true or status=up_to_date)
-                    const aiReady = intelStatus.isReady || intelStatus.status === 'up_to_date' || intelStatus.status === 'ready';
+                    // Check if AI analysis is ready (multiple conditions)
+                    const aiReady = intelStatus.isReady ||
+                                   intelStatus.status === 'up_to_date' ||
+                                   intelStatus.status === 'ready';
 
-                    if (!aiReady) {
+                    // Handle insufficient data status - this happens when there are no trends
+                    const insufficientData = intelStatus.status === 'insufficient_data' && intelStatus.recentTrends === 0;
+
+                    if (insufficientData) {
+                        updateProgressStep('intel-status', 'error', 'No trends in database - needs scraping');
+                        crossoverContent.innerHTML = `
+                            <div class="insight-card">
+                                <h3><i class="fas fa-database"></i> No Trends Data Available</h3>
+                                <p>The trends database is empty. You need to run a scrape first.</p>
+                                <p>Status: ${intelStatus.status}</p>
+                                <p>Recent trends: ${intelStatus.recentTrends}</p>
+                                <div style="margin-top: 15px;">
+                                    <button onclick="window.open('${TRENDS_API_URL || 'http://localhost:30003'}/api/scrape/trigger', '_blank')" style="margin-right: 10px; padding: 8px 16px; background: #EB008B; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                        Trigger Scrape
+                                    </button>
+                                    <button onclick="generateCrossoverInsights()" style="padding: 8px 16px; background: #31BDBF; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                        Try Anyway with Mock Data
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+
+                        // For now, try to continue with fallback/mock data
+                        console.log('No trends available, continuing with fallback data for demo purposes');
+                        // Don't return - continue to try strategic insights
+
+                    } else if (!aiReady) {
                         updateProgressStep('intel-status', 'error', `AI Coverage: ${Math.round((intelStatus.aiCoverage || 0) * 100)}%`);
                         crossoverContent.innerHTML = `
                             <div class="insight-card">
@@ -717,9 +745,10 @@
                             </div>
                         `;
                         return;
+                    } else {
+                        updateProgressStep('intel-status', 'completed', `${intelStatus.recentTrends || 'All'} trends analyzed`);
                     }
 
-                    updateProgressStep('intel-status', 'completed', `${intelStatus.recentTrends || 'All'} trends analyzed`);
                     updateProgressStep('strategic-insights', 'in-progress');
 
                     // Step 2: Get Strategic Insights from Trend Analysis AI Intel briefing
@@ -1167,17 +1196,21 @@
             try {
                 const [trendsResponse, creatorsResponse] = await Promise.all([
                     fetch('/api/trends/stats'),
-                    fetch('/api/creators/creators?limit=1')
+                    fetch('/api/creators/creators') // Remove limit to get all creators for accurate count
                 ]);
 
                 const trendsData = await trendsResponse.json();
                 const creatorsData = await creatorsResponse.json();
 
                 document.getElementById('trendsCount').textContent =
-                    trendsData.data?.totalTrends || 0;
+                    trendsData.data?.totalTrends || trendsData.totalTrends || 0;
 
-                document.getElementById('creatorsCount').textContent =
-                    creatorsData.length || creatorsData.data?.length || 0;
+                // Handle both array response and object with creators array
+                const creatorCount = Array.isArray(creatorsData) ?
+                    creatorsData.length :
+                    (creatorsData.creators?.length || creatorsData.data?.length || 0);
+
+                document.getElementById('creatorsCount').textContent = creatorCount;
 
             } catch (error) {
                 console.error('Failed to update counts:', error);
