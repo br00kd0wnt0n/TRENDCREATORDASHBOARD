@@ -53,6 +53,14 @@
     .counts { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
   </style>
   <script>
+    function compactNumber(n) {
+      if (n == null || isNaN(n)) return '';
+      const abs = Math.abs(n);
+      if (abs >= 1e9) return (abs/1e9).toFixed(1) + 'B';
+      if (abs >= 1e6) return (abs/1e6).toFixed(1) + 'M';
+      if (abs >= 1e3) return Math.round(abs/1e3) + 'K';
+      return String(abs);
+    }
     let API_BASE = '';
     async function fetchJSON(url, opts = {}) {
       const finalUrl = url.startsWith('/api/') ? (API_BASE + url) : url;
@@ -377,7 +385,9 @@
         const data = await resp.json();
         const list = document.getElementById('clist');
         list.innerHTML = '';
-        const items = Array.isArray(data.data) ? data.data : [];
+        let items = Array.isArray(data.data) ? data.data : [];
+        // sort by followers if available
+        items = items.sort((a,b) => (b.followers||0) - (a.followers||0));
         if (items.length === 0) {
           list.innerHTML = '<div class="empty">No creators found. Try a broader query or lower min followers.</div>';
           status.textContent = 'No creators found';
@@ -388,15 +398,21 @@
           const el = document.createElement('div');
           el.className = 'item';
           const url = c.profileUrl || (c.platform === 'instagram' ? `https://instagram.com/${c.handle}` : `https://www.tiktok.com/@${c.handle}`);
+          const followers = (typeof c.followers === 'number') ? compactNumber(c.followers) : '';
+          const engagement = (typeof c.engagementRate === 'number') ? (c.engagementRate*100).toFixed(1)+'%' : '';
+          const bio = (c.bio || '').toString().slice(0, 100);
+          const avatar = c.avatarUrl ? `<img src="${c.avatarUrl}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid #1f2937;"/>` : '';
+          const cats = (c.categories && c.categories.length) ? c.categories.join(', ') : '';
           el.innerHTML = `
             <div>
-              <div><strong>@${c.handle}</strong> <span class=\"tag\">${c.platform}</span></div>
+              <div class=\"row\" style=\"gap:8px;align-items:center;\">${avatar}<strong>@${c.handle}</strong> <span class=\"tag\">${c.platform}</span></div>
               <div class=\"meta\">
-                ${c.displayName ? `<span>${c.displayName}</span>` : ''}
-                ${typeof c.followers === 'number' ? `<span>${c.followers.toLocaleString()} followers</span>` : ''}
+                ${followers ? `<span>${followers} followers</span>` : ''}
+                ${engagement ? `<span>${engagement} eng</span>` : ''}
                 ${c.location ? `<span>${c.location}</span>` : ''}
-                ${c.categories && c.categories.length ? `<span>${c.categories.join(', ')}</span>` : ''}
+                ${cats ? `<span>${cats}</span>` : ''}
               </div>
+              ${bio ? `<div class=\"hint\" style=\"margin-top:4px;\">${bio}</div>` : ''}
             </div>
             <div class=\"row\" style=\"justify-content:flex-end;align-items:center;gap:8px;\">
               <a href=\"${url}\" target=\"_blank\" rel=\"noopener\" class=\"tag\">open</a>
@@ -443,6 +459,7 @@
           const tt = Array.isArray(data.data.tiktok) ? data.data.tiktok : [];
           creators = [...ig, ...tt];
         }
+        creators = creators.sort((a,b) => (b.followers||0) - (a.followers||0));
         if (!creators.length) {
           list.innerHTML = '<div class="empty">No creators discovered from trending posts. These are creators actively posting in the hashtags related to your top trends.</div>';
           status.textContent = 'No creators discovered';
@@ -453,15 +470,21 @@
           const el = document.createElement('div');
           el.className = 'item';
           const url = c.profileUrl || (c.platform === 'instagram' ? `https://instagram.com/${c.handle}` : `https://www.tiktok.com/@${c.handle}`);
+          const followers = (typeof c.followers === 'number') ? compactNumber(c.followers) : '';
+          const engagement = (typeof c.engagementRate === 'number') ? (c.engagementRate*100).toFixed(1)+'%' : '';
+          const bio = (c.bio || '').toString().slice(0, 100);
+          const avatar = c.avatarUrl ? `<img src="${c.avatarUrl}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid #1f2937;"/>` : '';
+          const cats = (c.categories && c.categories.length) ? c.categories.join(', ') : '';
           el.innerHTML = `
             <div>
-              <div><strong>@${c.handle}</strong> <span class=\"tag\">${c.platform}</span></div>
+              <div class=\"row\" style=\"gap:8px;align-items:center;\">${avatar}<strong>@${c.handle}</strong> <span class=\"tag\">${c.platform}</span></div>
               <div class=\"meta\">
-                ${c.displayName ? `<span>${c.displayName}</span>` : ''}
-                ${typeof c.followers === 'number' ? `<span>${c.followers.toLocaleString()} followers</span>` : ''}
+                ${followers ? `<span>${followers} followers</span>` : ''}
+                ${engagement ? `<span>${engagement} eng</span>` : ''}
                 ${c.location ? `<span>${c.location}</span>` : ''}
-                ${c.engagementRate ? `<span>${(c.engagementRate * 100).toFixed(2)}% engagement</span>` : ''}
+                ${cats ? `<span>${cats}</span>` : ''}
               </div>
+              ${bio ? `<div class=\"hint\" style=\"margin-top:4px;\">${bio}</div>` : ''}
             </div>
             <div class=\"row\" style=\"justify-content:flex-end;align-items:center;gap:8px;\">
               <a href=\"${url}\" target=\"_blank\" rel=\"noopener\" class=\"tag\">open</a>
