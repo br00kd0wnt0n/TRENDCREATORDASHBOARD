@@ -20,28 +20,22 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
         return [];
       }
 
-      // Content-focused seed hashtags to discover actual trends (avoiding meta platform hashtags)
+      // Content-focused seed hashtags tuned for West Coast -> India crossover
       const seedHashtags = [
-        // Current events & culture
-        'christmas2024', 'newyear2025', 'blackfriday', 'thanksgiving', 'halloween',
-        // Entertainment & media
-        'netflix', 'disney', 'marvel', 'anime', 'kpop', 'taylor swift', 'bts',
-        // Technology & innovation
-        'ai', 'chatgpt', 'iphone15', 'tesla', 'crypto', 'nft',
-        // Lifestyle & wellness
-        'meditation', 'yoga', 'vegan', 'skincare', 'mentalhealth',
-        // Food & culture
-        'korean', 'italian', 'mexican', 'sushi', 'pizza', 'coffee',
-        // Sports & fitness
-        'nfl', 'basketball', 'soccer', 'olympics', 'gym', 'running',
-        // Fashion & beauty
-        'vintage', 'sustainable', 'makeup', 'nails', 'streetwear'
+        // West Coast culture & locales
+        'hollywood', 'losangeles', 'venicebeach', 'santamonica', 'bayarea', 'siliconvalley',
+        // Entertainment patterns
+        'dancechallenge', 'comedyreels', 'musictrend', 'soundofweek', 'filmtok',
+        // Tech & creator economy (SV -> India affinity)
+        'ai', 'startuplife', 'techhumor', 'codingmemes',
+        // India resonance hooks
+        'bollywood', 'cricket', 'desimemes', 'reelsindia'
       ];
 
       // Start the Instagram hashtag stats scraper with correct input format
       const inputData = {
-        hashtags: seedHashtags.slice(0, 5), // Use first 5 seed hashtags (fewer for free tier)
-        resultsLimit: 5 // Small limit for trending discovery
+        hashtags: seedHashtags.slice(0, 5), // keep modest for tier limits
+        resultsLimit: 8 // slightly higher to widen discovery set
       };
 
       console.log('🎯 APIFY-INSTAGRAM-STATS: Sending input:', JSON.stringify(inputData, null, 2));
@@ -164,6 +158,7 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
                   category = 'Lifestyle';
                 }
 
+                const postsPerDayFreq = (hashtagData?.info && (hashtagData.info.postsPerDay || hashtagData.info.posts_per_day)) || undefined;
                 trends.push({
                   hashtag: hashtag,
                   popularity: hashtagData.info || 'Trending',
@@ -178,6 +173,7 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
                     apify_run_id: runId,
                     related_to: item.name,
                     frequency_type: 'frequent',
+                    ...(typeof postsPerDayFreq === 'number' ? { posts_per_day: postsPerDayFreq } : {}),
                     original_data: hashtagData
                   }
                 });
@@ -239,6 +235,7 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
                   category = 'Lifestyle';
                 }
 
+                const postsPerDayRel = (hashtagData?.info && (hashtagData.info.postsPerDay || hashtagData.info.posts_per_day)) || undefined;
                 trends.push({
                   hashtag: hashtag,
                   popularity: hashtagData.info || 'Related trending',
@@ -253,6 +250,7 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
                     apify_run_id: runId,
                     related_to: item.name,
                     frequency_type: 'related',
+                    ...(typeof postsPerDayRel === 'number' ? { posts_per_day: postsPerDayRel } : {}),
                     original_data: hashtagData
                   }
                 });
@@ -318,7 +316,12 @@ export const ApifyInstagramHashtagStatsSource: TrendSource = {
       if (error.response) {
         console.error('❌ APIFY-INSTAGRAM-STATS: Response status:', error.response.status);
         console.error('❌ APIFY-INSTAGRAM-STATS: Response data:', JSON.stringify(error.response.data, null, 2));
-        console.error('❌ APIFY-INSTAGRAM-STATS: Request URL:', 'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats/runs');
+        console.error('❌ APIFY-INSTAGRAM-STATS: Request URL:', error.config?.url || 'https://api.apify.com/v2/acts/apify~instagram-hashtag-stats/runs');
+
+        if (error.response.status === 401) {
+          console.error('🔐 APIFY-INSTAGRAM-STATS: Authentication failed! Check your APIFY_TOKEN in .env');
+          console.error('🔐 APIFY-INSTAGRAM-STATS: Current token (first 10 chars):', process.env.APIFY_TOKEN?.substring(0, 10) + '...');
+        }
       }
 
       logger.error('Apify Instagram hashtag stats extraction failed:', error);

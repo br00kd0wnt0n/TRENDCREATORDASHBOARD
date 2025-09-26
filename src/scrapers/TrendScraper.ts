@@ -103,6 +103,14 @@ export class TrendScraper {
       progressManager.initializeScraping(sourceNames);
 
       logger.info(`🚀 Starting comprehensive trend scraping across ${sourcesToScrape.length} sources...`);
+      console.log('\n' + '='.repeat(80));
+      console.log('🎯 SCRAPING SESSION STARTED');
+      console.log('='.repeat(80));
+      console.log(`📋 Sources to scrape: ${sourcesToScrape.length}`);
+      sourcesToScrape.forEach((source, idx) => {
+        console.log(`   ${idx + 1}. ${source.name} (${source.scrapeMethod})`);
+      });
+      console.log('='.repeat(80) + '\n');
 
       for (let i = 0; i < sourcesToScrape.length; i++) {
         const source = sourcesToScrape[i];
@@ -177,12 +185,36 @@ export class TrendScraper {
       const report = await this.aiService.generateTrendReport(allTrends);
       logger.info(`📋 AI trend report generated (${report.length} characters)`);
       
+      console.log('\n' + '='.repeat(80));
+      console.log('✅ SCRAPING SESSION COMPLETED');
+      console.log('='.repeat(80));
+      console.log(`📊 RESULTS SUMMARY:`);
+      console.log(`   • Sources processed: ${scrapingStats.completedSources}/${scrapingStats.totalSources}`);
+      console.log(`   • Successful sources: ${scrapingStats.successfulSources}/${scrapingStats.totalSources}`);
+      console.log(`   • Total trends collected: ${allTrends.length}`);
+      console.log(`   • Errors: ${scrapingStats.errors.length}`);
+
+      if (scrapingStats.errors.length > 0) {
+        console.log(`\n🚨 ERRORS ENCOUNTERED:`);
+        scrapingStats.errors.forEach((err, idx) => {
+          console.log(`   ${idx + 1}. ${err}`);
+        });
+      }
+
+      if (allTrends.length > 0) {
+        console.log(`\n📋 SAMPLE TRENDS COLLECTED:`);
+        allTrends.slice(0, 5).forEach((trend, idx) => {
+          console.log(`   ${idx + 1}. ${trend.hashtag} (${trend.platform}) - ${trend.category}`);
+        });
+      }
+      console.log('='.repeat(80) + '\n');
+
       logger.info(`🎉 Scraping complete! Summary:`);
       logger.info(`   • Sources processed: ${scrapingStats.completedSources}/${scrapingStats.totalSources}`);
       logger.info(`   • Successful sources: ${scrapingStats.successfulSources}/${scrapingStats.totalSources}`);
       logger.info(`   • Total trends collected: ${allTrends.length}`);
       logger.info(`   • Errors: ${scrapingStats.errors.length}`);
-      
+
       if (scrapingStats.errors.length > 0) {
         logger.warn(`🚨 Errors encountered: ${scrapingStats.errors.join('; ')}`);
       }

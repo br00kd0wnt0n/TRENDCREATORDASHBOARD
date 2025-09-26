@@ -171,8 +171,20 @@ export const ApifyTikTokHashtagSource: TrendSource = {
 
       return trends;
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ APIFY-HASHTAGS: Error:', error);
+
+      if (error.response) {
+        console.error('❌ APIFY-HASHTAGS: Response status:', error.response.status);
+        console.error('❌ APIFY-HASHTAGS: Response data:', JSON.stringify(error.response.data, null, 2));
+        console.error('❌ APIFY-HASHTAGS: Request URL:', error.config?.url);
+
+        if (error.response.status === 401) {
+          console.error('🔐 APIFY-HASHTAGS: Authentication failed! Check your APIFY_TOKEN in .env');
+          console.error('🔐 APIFY-HASHTAGS: Current token (first 10 chars):', process.env.APIFY_TOKEN?.substring(0, 10) + '...');
+        }
+      }
+
       logger.error('Apify TikTok hashtag extraction failed:', error);
       return [];
     }

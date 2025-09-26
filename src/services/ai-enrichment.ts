@@ -51,25 +51,26 @@ export class AIEnrichmentService {
   private buildAnalysisPrompt(trends: TrendData[]): string {
     return `You are an expert trend analyst specializing in digital culture and business intelligence.
     
-Analyze these trending topics and provide strategic insights:
+Project context: We are curating content for Amazon Prime Video India's new Instagram handle "In Our Prime". The vibe is creator-led, fan-made, not traditional marketing. Target audience: Gen Z and Millennials in India. We care about short-form memeability (Reels/TikTok), cultural transposability, and low context dependence. De-emphasize generic sales/holiday/greeting tags.
+
+Analyze these trending topics and provide strategic insights with this lens:
 
 ${JSON.stringify(trends, null, 2)}
 
 For each trend, provide a structured JSON analysis with:
-1. "insights": Deep cultural and market insights (2-3 sentences)
+1. "insights": Deep cultural and market insights (2-3 sentences) relevant to the "In Our Prime" creator-led style
 2. "sentiment": Overall sentiment (positive/neutral/negative)
 3. "predictedGrowth": Growth trajectory (increasing/stable/declining)
-4. "businessOpportunities": Array of 2-3 specific business opportunities
+4. "businessOpportunities": Array of 2-3 specific creator-led content ideas or programming hooks
 5. "relatedTrends": Array of 2-3 related or complementary trends
-6. "confidence": Confidence score (0.0-1.0) in your analysis
+6. "confidence": Confidence score (0.0-1.0) reflecting crossover fit for "In Our Prime" (IG/TikTok memeability, Indian audience receptivity, recency)
 
 Consider:
-- Cross-platform trend correlation
-- Demographic implications
-- Monetization potential
-- Content strategy opportunities
-- Emerging patterns and weak signals
-- Cultural shifts and zeitgeist indicators
+- Short-form memeability (remix, template, audio/sound)
+- Entertainment/comedy/dance/music/tech culture crossover
+- Gen Z/Millennial resonance in India
+- Deprioritize generic commerce/holiday/greeting hashtags and outdated year-stamped tags
+- Cross-platform signals and recency
 
 Return a JSON object with trend identifiers as keys and analysis objects as values.`;
   }
@@ -167,7 +168,7 @@ Format as a professional report with sections and bullet points.`
         temperature: 0.6,
         messages: [{
           role: 'user',
-          content: `As a digital culture and trend intelligence expert, analyze these trending hashtags and provide insights about what they reveal:
+          content: `As a digital culture and trend intelligence expert, analyze these trending hashtags and provide insights about what they reveal, tuned for Amazon Prime Video India's "In Our Prime" Instagram handle (creator-led, fan-made, not traditional marketing; Gen Z/Millennial audience):
 
 ${JSON.stringify(stats, null, 2)}
 

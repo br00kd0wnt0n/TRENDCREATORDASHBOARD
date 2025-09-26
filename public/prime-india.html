@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazon Prime India "In Our Prime" Trend Spotter</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #111827;
+      --muted: #9ca3af;
+      --text: #e5e7eb;
+      --accent: #22c55e;
+      --accent2: #22a6f2;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    h1 { font-size: 20px; margin: 0; }
+    .badge { font-size: 12px; color: var(--muted); }
+    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; background: var(--panel); padding: 12px; border-radius: 10px; }
+    .control { display: flex; align-items: center; gap: 8px; }
+    .export-control { align-items: flex-start; }
+    .compact select, .compact input, .compact button { font-size: 12px; padding: 6px 8px; }
+    .export-group { position: relative; }
+    .export-popover { position: absolute; right: 0; top: 40px; background: var(--panel); border: 1px solid #1f2937; border-radius: 8px; padding: 10px; z-index: 50; width: 420px; box-shadow: 0 12px 24px rgba(0,0,0,0.35); }
+    .export-popover .row { margin-top: 8px; }
+    select, input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #1f2937; background: #0f172a; color: var(--text); }
+    button { padding: 10px 14px; background: var(--accent); color: #022c22; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #1f2937; color: var(--text); }
+    button.accent2 { background: var(--accent2); color: #001b2b; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-top: 12px; }
+    .panel { background: var(--panel); border: 1px solid #1f2937; border-radius: 10px; padding: 12px; min-height: 300px; }
+    .panel h3 { margin: 0 0 8px 0; font-size: 14px; color: var(--muted); }
+    .list { display: grid; gap: 8px; }
+    /* Make Candidate Trends list scrollable to preserve layout */
+    #list { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 2px; }
+    .item { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 10px; border-radius: 8px; background: #0f172a; border: 1px solid #1f2937; }
+    .details { grid-column: 1 / -1; margin-top: 6px; background: #0b1223; border: 1px dashed #1f2a3a; border-radius: 6px; padding: 8px; color: var(--muted); font-size: 12px; }
+    .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; }
+    .tag { padding: 2px 6px; border-radius: 999px; background: #111827; border: 1px solid #1f2937; color: var(--muted); font-size: 11px; }
+    .score { color: var(--warning); font-weight: 700; }
+    .empty { color: var(--muted); font-size: 14px; padding: 8px; text-align: center; }
+    .footer { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+    .aiout { white-space: pre-wrap; background: #0f172a; border: 1px solid #1f2937; border-radius: 8px; padding: 10px; min-height: 200px; font-size: 13px; color: var(--text); }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .hint { font-size: 12px; color: var(--muted); }
+    .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size: 12px; }
+    .counts { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+  </style>
+  <script>
+    async function fetchJSON(url, opts = {}) {
+      const res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers||{}) } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+
+    const state = {
+      timeframe: '24h',
+      platform: 'ig_tt',
+      q: '',
+      caliKeywords: 'cali,california,los angeles,la,hollywood,bay area,sf,san francisco,oakland,silicon valley,venice,santa monica',
+      limit: 50,
+      trends: [],
+      filtered: [],
+    };
+
+    function platformMatch(p) {
+      if (state.platform === 'ig_tt') return p === 'Instagram' || p === 'TikTok';
+      if (state.platform === 'ig') return p === 'Instagram';
+      if (state.platform === 'tt') return p === 'TikTok';
+      return true;
+    }
+
+    async function applyCrossoverScoring() {
+      try {
+        const payload = { trends: state.trends };
+        const res = await fetch('/api/crossover/score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data?.data)) state.trends = data.data;
+      } catch (e) { /* ignore */ }
+    }
+
+    function renderList() {
+      const list = document.getElementById('list');
+      list.innerHTML = '';
+      const q = state.q.trim().toLowerCase();
+      const caliTerms = state.caliKeywords.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+      const items = state.trends.filter(t => platformMatch(t.platform))
+        .filter(t => !q || (t.hashtag && t.hashtag.toLowerCase().includes(q)) || (t.category||'').toLowerCase().includes(q) || (t.aiInsights||'').toLowerCase().includes(q))
+        .map(t => ({
+          ...t,
+          caliHit: caliTerms.some(k => (t.hashtag||'').toLowerCase().includes(k) || (t.aiInsights||'').toLowerCase().includes(k)),
+        }))
+        .sort((a,b) => (b.crossoverScore ?? b.confidence ?? 0) - (a.crossoverScore ?? a.confidence ?? 0));
+
+      state.filtered = items;
+
+      // Update platform counts
+      const countsEl = document.getElementById('platCounts');
+      if (countsEl) {
+        const ig = items.filter(t => (t.platform||'').toLowerCase().includes('instagram')).length;
+        const tt = items.filter(t => (t.platform||'').toLowerCase().includes('tiktok')).length;
+        countsEl.innerHTML = `IG: <strong>${ig}</strong> · TikTok: <strong>${tt}</strong> · Total: <strong>${items.length}</strong>`;
+      }
+
+      if (items.length === 0) {
+        list.innerHTML = '<div class="empty">No matching trends. Try widening filters.</div>';
+        return;
+      }
+
+      const frag = document.createDocumentFragment();
+      items.forEach((t, i) => {
+        const el = document.createElement('div');
+        el.className = 'item';
+        el.setAttribute('data-index', String(i));
+        el.innerHTML = `
+          <div>
+            <div><strong>${(t.hashtag || '').replace(/^#?/, '#')}</strong></div>
+            <div class="meta">
+              <span class="tag">${t.platform}</span>
+              <span class="tag">${t.category || 'General'}</span>
+              <span class="tag">sent: ${t.sentiment || 'neutral'}</span>
+              ${t.caliHit ? '<span class="tag" style="border-color:#16a34a;color:#a7f3d0;background:#052e1d;">cali-signal</span>' : ''}
+              ${t.volumeDisplay ? `<span class=\\"tag\\" title=\\"volume\\">vol: ${t.volumeDisplay}</span>` : ''}
+              ${t.rateDisplay ? `<span class=\\"tag\\" title=\\"posts per day\\">rate: ${t.rateDisplay}</span>` : ''}
+              ${typeof t.growth === 'number' ? `<span class=\\"tag\\" title=\\"growth vs last\\">Δ: ${t.growthDisplay}</span>` : ''}
+            </div>
+          </div>
+          <div class="row" style="justify-content:flex-end;align-items:center;gap:10px;">
+            <span class="score" title="crossover score">${(t.crossoverScore ?? t.confidence ?? 0).toFixed(2)}</span>
+          </div>
+        `;
+        frag.appendChild(el);
+      });
+      list.appendChild(frag);
+    }
+
+    async function loadTrends() {
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true; btn.textContent = 'Loading…';
+      try {
+        const tf = document.getElementById('timeframe').value;
+        const limit = state.limit;
+        const data = await fetchJSON(`/api/trending/top-with-metrics?platform=all&timeframe=${encodeURIComponent(tf)}&limit=${limit}`);
+        state.trends = Array.isArray(data.data) ? data.data : [];
+        await applyCrossoverScoring();
+        renderList();
+      } catch (e) {
+        console.error(e);
+        alert('Failed to load trends');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Refresh';
+      }
+    }
+
+    async function generateShortlist() {
+      const btn = document.getElementById('shortlistBtn');
+      const out = document.getElementById('aiout');
+      btn.disabled = true; btn.textContent = 'Scoring…';
+      try {
+        const top = state.filtered.slice(0, 25).map(t => ({
+          hashtag: t.hashtag,
+          platform: t.platform,
+          category: t.category,
+          confidence: t.confidence,
+          sentiment: t.sentiment,
+          aiInsights: t.aiInsights
+        }));
+
+        const prompt = `You are analyzing crossover potential for Amazon Prime Video India's new Instagram handle "In Our Prime". The style is creator-led and fan-made (not traditional marketing). Prioritize Instagram and TikTok trends that are likely to resonate with Gen Z/Millennial Indian audiences within the next 1-4 weeks. Consider:
+        
+        - Visual storytelling and short-form memeability (remix/template/audio)
+        - Relevance to Indian youth culture and OTT viewing habits
+        - Recurring themes (music, dance, comedy, celebrity, tech, sports)
+        - Cultural transposability and low context dependence
+        - Low platform friction and hashtag clarity; de-emphasize generic sales/holiday/greeting tags
+        
+        Output:
+        1) A crisp bullet shortlist (8–12) with hashtag, platform, and one-line rationale tailored to "In Our Prime"
+        2) A 3-5 bullet action plan for seeding/testing on Prime Video India socials
+        3) Any watchouts on rights/cultural nuance.
+        
+        Candidate trends:
+        ${JSON.stringify(top, null, 2)}
+        `;
+
+        const res = await fetchJSON('/api/trends/ask', { method: 'POST', body: JSON.stringify({ question: prompt })});
+        out.textContent = (res?.data?.answer) || 'No response.';
+      } catch (e) {
+        console.error(e);
+        alert('Failed to generate shortlist');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Generate Crossover Shortlist';
+      }
+    }
+
+    let scrapeTimer = null;
+    async function getScrapeStatus() {
+      try {
+        const r = await fetch('/api/scrape/status');
+        if (!r.ok) return null;
+        const j = await r.json();
+        return j?.data || null;
+      } catch { return null; }
+    }
+
+    function setScrapeInfo(text) {
+      let el = document.getElementById('scrapeInfo');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'scrapeInfo';
+        el.className = 'hint';
+        document.querySelector('.controls')?.appendChild(el);
+      }
+      el.textContent = text;
+    }
+
+    async function pollScrapeUntilDone() {
+      clearInterval(scrapeTimer);
+      scrapeTimer = setInterval(async () => {
+        const s = await getScrapeStatus();
+        if (!s) return;
+        if (s.isRunning) {
+          const src = s.currentSource ? ` · ${s.currentSource}` : '';
+          setScrapeInfo(`Scraping ${Math.round(s.progress)}% (${s.completedSources}/${s.totalSources})${src}`);
+        } else {
+          clearInterval(scrapeTimer);
+          setScrapeInfo(`Scrape complete · ${s.trends?.length || 0} trends`);
+          // Refresh list after short delay to pick up new data
+          setTimeout(loadTrends, 800);
+          const btn = document.getElementById('scrapeBtn');
+          btn.disabled = false; btn.textContent = 'Run Scrape (IG+TikTok)';
+        }
+      }, 3000);
+    }
+
+    async function runScrape() {
+      const btn = document.getElementById('scrapeBtn');
+      btn.disabled = true; btn.textContent = 'Starting…';
+      try {
+        setScrapeInfo('Scheduling scrape…');
+        const r = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platforms: ['Instagram','TikTok'] })
+        });
+        const j = await r.json();
+        if (j?.success === false && j?.message?.includes('already in progress')) {
+          setScrapeInfo('Scrape already running…');
+        } else {
+          setScrapeInfo('Scrape started…');
+        }
+        await pollScrapeUntilDone();
+      } catch (e) {
+        console.error(e);
+        alert('Failed to start scrape');
+        btn.disabled = false; btn.textContent = 'Run Scrape (IG+TikTok)';
+      }
+    }
+
+    async function runScrapeIG() {
+      const btn = document.getElementById('scrapeIgBtn');
+      btn.disabled = true; btn.textContent = 'Starting…';
+      try {
+        setScrapeInfo('Scheduling Instagram scrape…');
+        const r = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platforms: ['Instagram'] })
+        });
+        const j = await r.json();
+        if (j?.success === false && j?.message?.includes('already in progress')) {
+          setScrapeInfo('Scrape already running…');
+        } else {
+          setScrapeInfo('Instagram scrape started…');
+        }
+        await pollScrapeUntilDone();
+      } catch (e) {
+        console.error(e);
+        alert('Failed to start Instagram scrape');
+        btn.disabled = false; btn.textContent = 'Run IG Only';
+      }
+    }
+
+    // header source status removed; using inline scrape status below controls only
+
+    function resolvePlatforms(value) {
+      if (value === 'ig') return ['Instagram'];
+      if (value === 'tt') return ['TikTok'];
+      if (value === 'ig_tt') return ['Instagram','TikTok'];
+      return [];
+    }
+
+    function openExport(format) {
+      const srcSel = document.getElementById('exportSource').value;
+      const platSel = document.getElementById('exportPlat').value;
+      const score = document.getElementById('exportScore').checked ? 'true' : 'false';
+
+      let source = 'last';
+      let timeframe = undefined;
+      if (srcSel === 'last') {
+        source = 'last';
+      } else {
+        source = 'db';
+        timeframe = srcSel;
+      }
+
+      let platforms = resolvePlatforms(platSel);
+      const params = new URLSearchParams();
+      params.set('format', format);
+      params.set('source', source);
+      if (timeframe) params.set('timeframe', timeframe);
+      if (platforms.length) params.set('platforms', platforms.join(','));
+      params.set('score', score);
+      const url = `/api/scrape/export?${params.toString()}`;
+      window.open(url, '_blank');
+    }
+
+    function toggleExportOptions(e) {
+      e?.stopPropagation?.();
+      const pop = document.getElementById('exportPopover');
+      if (!pop) return;
+      pop.style.display = (pop.style.display === 'none' || !pop.style.display) ? 'block' : 'none';
+    }
+
+    function closeExportOptions() {
+      const pop = document.getElementById('exportPopover');
+      if (pop) pop.style.display = 'none';
+    }
+
+    function copyOutput() {
+      const out = document.getElementById('aiout');
+      navigator.clipboard.writeText(out.textContent || '').then(() => {
+        const btn = document.getElementById('copyBtn');
+        const old = btn.textContent; btn.textContent = 'Copied';
+        setTimeout(() => btn.textContent = old, 1200);
+      });
+    }
+
+    async function searchCreators() {
+      const btn = document.getElementById('creatorSearchBtn');
+      btn.disabled = true; btn.textContent = 'Searching…';
+      try {
+        const platform = document.getElementById('cplat').value;
+        const q = document.getElementById('cquery').value;
+        const minFollowers = parseInt(document.getElementById('cmin').value || '0');
+        const limit = 10;
+        const data = await fetchJSON(`/api/creators/search?platform=${encodeURIComponent(platform)}&q=${encodeURIComponent(q)}&limit=${limit}&minFollowers=${minFollowers}`);
+        const list = document.getElementById('clist');
+        list.innerHTML = '';
+        const items = Array.isArray(data.data) ? data.data : [];
+        if (items.length === 0) {
+          list.innerHTML = '<div class="empty">No creators found. Try a broader query or lower min followers.</div>';
+          return;
+        }
+        const frag = document.createDocumentFragment();
+        items.forEach(c => {
+          const el = document.createElement('div');
+          el.className = 'item';
+          const url = c.profileUrl || (c.platform === 'instagram' ? `https://instagram.com/${c.handle}` : `https://www.tiktok.com/@${c.handle}`);
+          el.innerHTML = `
+            <div>
+              <div><strong>@${c.handle}</strong> <span class=\"tag\">${c.platform}</span></div>
+              <div class=\"meta\">
+                ${c.displayName ? `<span>${c.displayName}</span>` : ''}
+                ${typeof c.followers === 'number' ? `<span>${c.followers.toLocaleString()} followers</span>` : ''}
+                ${c.location ? `<span>${c.location}</span>` : ''}
+                ${c.categories && c.categories.length ? `<span>${c.categories.join(', ')}</span>` : ''}
+              </div>
+            </div>
+            <div class=\"row\" style=\"justify-content:flex-end;align-items:center;gap:8px;\">
+              <a href=\"${url}\" target=\"_blank\" rel=\"noopener\" class=\"tag\">open</a>
+            </div>
+          `;
+          frag.appendChild(el);
+        });
+        list.appendChild(frag);
+      } catch (e) {
+        console.error(e);
+        alert('Creator search failed');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Search Creators';
+      }
+    }
+
+    async function discoverCreatorsFromTrends() {
+      const btn = document.getElementById('discoverBtn');
+      btn.disabled = true; const old = btn.textContent; btn.textContent = 'Discovering…';
+      try {
+        const top = (state.filtered.length ? state.filtered : state.trends).slice(0, 12);
+        const seeds = top.map(t => (t.hashtag || '').replace('#','')).filter(Boolean);
+        if (!seeds.length) { alert('No trend seeds available yet. Try Refresh or Run Scrape.'); return; }
+        const platSel = document.getElementById('cplat').value;
+        const platforms = platSel === 'both' ? ['instagram','tiktok'] : (platSel === 'instagram' ? ['instagram'] : ['tiktok']);
+        const minFollowers = parseInt(document.getElementById('cmin')?.value || '0');
+        const res = await fetch('/api/creators/discover', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ platforms, seeds, limit: 20, minFollowers, maxHashtags: 8 })
+        });
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+        const list = document.getElementById('clist');
+        list.innerHTML = '';
+        let creators = [];
+        if (Array.isArray(data.data)) {
+          creators = data.data;
+        } else if (data && data.data && typeof data.data === 'object') {
+          const ig = Array.isArray(data.data.instagram) ? data.data.instagram : [];
+          const tt = Array.isArray(data.data.tiktok) ? data.data.tiktok : [];
+          creators = [...ig, ...tt];
+        }
+        if (!creators.length) {
+          list.innerHTML = '<div class="empty">No creators discovered from trending posts. These are creators actively posting in the hashtags related to your top trends.</div>';
+          return;
+        }
+        const frag = document.createDocumentFragment();
+        creators.forEach(c => {
+          const el = document.createElement('div');
+          el.className = 'item';
+          const url = c.profileUrl || (c.platform === 'instagram' ? `https://instagram.com/${c.handle}` : `https://www.tiktok.com/@${c.handle}`);
+          el.innerHTML = `
+            <div>
+              <div><strong>@${c.handle}</strong> <span class=\"tag\">${c.platform}</span></div>
+              <div class=\"meta\">
+                ${c.displayName ? `<span>${c.displayName}</span>` : ''}
+                ${typeof c.followers === 'number' ? `<span>${c.followers.toLocaleString()} followers</span>` : ''}
+                ${c.location ? `<span>${c.location}</span>` : ''}
+                ${c.engagementRate ? `<span>${(c.engagementRate * 100).toFixed(2)}% engagement</span>` : ''}
+              </div>
+            </div>
+            <div class=\"row\" style=\"justify-content:flex-end;align-items:center;gap:8px;\">
+              <a href=\"${url}\" target=\"_blank\" rel=\"noopener\" class=\"tag\">open</a>
+            </div>
+          `;
+          frag.appendChild(el);
+        });
+        list.appendChild(frag);
+      } catch (e) {
+        console.error(e);
+        alert('Creator discovery failed: ' + e.message);
+      } finally {
+        btn.disabled = false; btn.textContent = old;
+      }
+    }
+
+    async function findRelated() {
+      const btn = document.getElementById('relBtn');
+      btn.disabled = true; btn.textContent = 'Finding…';
+      try {
+        const plat = document.getElementById('relPlatform').value || 'instagram';
+        const raw = (document.getElementById('relInput').value || '').trim();
+        if (!raw) { alert('Enter comma-separated keywords/hashtags'); return; }
+        const seeds = raw.split(',').map(s => s.trim()).filter(Boolean);
+        const res = await fetch('/api/hashtags/related', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ platform: plat, hashtags: seeds, limit: 24 })});
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+        const box = document.getElementById('relOut');
+        const items = Array.isArray(data.data) ? data.data : [];
+        if (items.length === 0) { box.textContent = 'No related hashtags found.'; return; }
+        box.textContent = items.map(it => `${it.hashtag}${typeof it.popularity==='number' ? ' · '+it.popularity : ''}`).join('\n');
+      } catch (e) {
+        console.error(e);
+        alert('Failed to fetch related hashtags');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Find Related';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('timeframe').addEventListener('change', e => { state.timeframe = e.target.value; loadTrends(); });
+      document.getElementById('platform').addEventListener('change', e => { state.platform = e.target.value; renderList(); });
+      document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
+      document.getElementById('cali').addEventListener('input', e => { state.caliKeywords = e.target.value; renderList(); });
+      document.getElementById('refreshBtn').addEventListener('click', loadTrends);
+      document.getElementById('shortlistBtn').addEventListener('click', generateShortlist);
+      document.getElementById('copyBtn').addEventListener('click', copyOutput);
+      document.getElementById('scrapeBtn').addEventListener('click', runScrape);
+      document.getElementById('scrapeIgBtn').addEventListener('click', runScrapeIG);
+      document.getElementById('creatorSearchBtn')?.addEventListener('click', searchCreators);
+      document.getElementById('discoverBtn')?.addEventListener('click', discoverCreatorsFromTrends);
+      document.getElementById('relBtn')?.addEventListener('click', findRelated);
+      document.getElementById('exportCsvBtn')?.addEventListener('click', () => { closeExportOptions(); openExport('csv'); });
+      document.getElementById('exportCsvBtn2')?.addEventListener('click', () => { closeExportOptions(); openExport('csv'); });
+      document.getElementById('exportToggle')?.addEventListener('click', toggleExportOptions);
+      document.addEventListener('click', (ev) => {
+        const pop = document.getElementById('exportPopover');
+        const grp = document.querySelector('.export-group');
+        if (!pop || !grp) return;
+        if (!grp.contains(ev.target)) closeExportOptions();
+      });
+      loadTrends();
+    });
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Amazon Prime India "In Our Prime" Trend Spotter</h1>
+        <div class="badge">California-to-India crossover discovery · v0.1</div>
+        
+      </div>
+      <div class="row">
+        <a href="/" class="hint">Back to main dashboard</a>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="control">
+        <label for="timeframe" class="hint">Timeframe</label>
+        <select id="timeframe">
+          <option value="24h" selected>Last 24h</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="platform" class="hint">Platforms</label>
+        <select id="platform">
+          <option value="ig_tt" selected>Instagram + TikTok</option>
+          <option value="ig">Instagram only</option>
+          <option value="tt">TikTok only</option>
+          <option value="all">All (debug)</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="q" class="hint">Filter text (hashtag/category/insights)</label>
+        <input id="q" placeholder="e.g. dance, comedy, ai" />
+      </div>
+      <div class="control">
+        <label for="cali" class="hint">California signal keywords</label>
+        <input id="cali" value="cali,california,los angeles,la,hollywood,bay area,sf,san francisco,oakland,silicon valley,venice,santa monica" />
+      </div>
+      <div class="control" style="grid-column: 1 / -1; align-items:flex-end; gap:8px; justify-content:space-between;">
+        <div style="display:flex; gap:8px;">
+          <button id="refreshBtn">Refresh</button>
+          <button id="scrapeBtn" class="secondary" title="Run fresh scrape for Instagram + TikTok">Run Scrape (IG+TikTok)</button>
+          <button id="scrapeIgBtn" class="secondary" title="Run Instagram Stats actor only">Run IG Only</button>
+        </div>
+        <div class="export-group" style="display:flex; gap:8px;">
+          <button id="exportCsvBtn" class="secondary" title="Export CSV with defaults">Export CSV</button>
+          <button id="exportToggle" class="secondary" title="Export options">Options</button>
+          <div id="exportPopover" class="export-popover" style="display:none;">
+            <div class="hint">Export options</div>
+            <div class="row compact" style="gap:8px; flex-wrap:wrap; align-items:center;">
+              <select id="exportSource" class="compact" title="Which data to export">
+                <option value="last">Last Scrape</option>
+                <option value="24h">Recent 24h</option>
+                <option value="7d">Recent 7d</option>
+                <option value="30d">Recent 30d</option>
+              </select>
+              <select id="exportPlat" class="compact" title="Platforms">
+                <option value="ig_tt">IG+TikTok</option>
+                <option value="ig">Instagram</option>
+                <option value="tt">TikTok</option>
+                <option value="all">All</option>
+              </select>
+              <label class="row compact" style="gap:6px;">
+                <input type="checkbox" id="exportScore" checked />
+                <span class="hint">Include score</span>
+              </label>
+              <button id="exportCsvBtn2" class="secondary">Export CSV</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3>Candidate Trends (Crossover-Scored)</h3>
+        <div class="hint">Score 0.00–1.00 · higher = stronger crossover fit for “In Our Prime” based on IG/TikTok memeability, India audience resonance, platform fit, clarity, and recency. Generic/old commercial or greeting tags are down‑weighted.</div>
+        <div id="platCounts" class="counts">IG: — · TikTok: — · Total: —</div>
+        <div id="list" class="list"></div>
+      </div>
+      <div class="panel">
+        <h3>AI Crossover Brief</h3>
+        <div id="aiout" class="aiout">Use "Generate Crossover Shortlist" to produce a ready-to-share brief tailored for Prime Video India social programming.</div>
+        <div class="footer">
+          <button class="secondary" id="copyBtn">Copy</button>
+          <button class="accent2" id="shortlistBtn">Generate Crossover Shortlist</button>
+        </div>
+      </div>
+    </div>
+    <div class="twocol" style="margin-top:12px;">
+      <div class="panel">
+        <h3>Creator Finder</h3>
+        <div class="row" style="gap:10px;flex-wrap:wrap;">
+          <div style="flex:1 1 150px;">
+            <label class="hint">Platform</label>
+            <select id="cplat">
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+              <option value="both" selected>Both</option>
+            </select>
+          </div>
+          <div style="flex:3 1 260px;">
+            <label class="hint">Search</label>
+            <input id="cquery" placeholder="e.g. bollywood dance, la comedy, silicon valley meme" />
+          </div>
+          <div style="flex:1 1 140px;">
+            <label class="hint">Min Followers</label>
+            <input id="cmin" type="number" value="0" />
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button id="creatorSearchBtn">Search Creators</button>
+          </div>
+        </div>
+        <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="hint">Or discover creators actively posting in trend hashtags:</div>
+          <button id="discoverBtn" class="accent2">Discover from Trending Posts</button>
+        </div>
+        <div id="clist" class="list" style="margin-top:10px;"></div>
+      </div>
+      <div class="panel">
+        <h3>Related Hashtags</h3>
+        <div class="row" style="gap:10px;flex-wrap:wrap;">
+          <div style="flex: 1 1 160px;">
+            <label class="hint">Platform</label>
+            <select id="relPlatform">
+              <option value="instagram">Instagram</option>
+              <option value="tiktok">TikTok</option>
+            </select>
+          </div>
+          <div style="flex: 1 1 100%;">
+            <label class="hint">Seeds (comma-separated trends/keywords)</label>
+            <input id="relInput" placeholder="#la dance, hollywood meme, silicon valley" />
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button id="relBtn">Find Related</button>
+          </div>
+        </div>
+        <div id="relOut" class="aiout mono" style="margin-top:10px; min-height: 120px;">Enter seeds and tap Find Related to fetch Instagram related/adjacent hashtags via Apify.</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

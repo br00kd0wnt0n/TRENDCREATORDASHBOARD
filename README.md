@@ -101,6 +101,15 @@ npm run build
 npm start
 
 # Dashboard available at: http://localhost:30003
+# Prime India Trend Spotter: http://localhost:30003/prime-india
+
+## Prime India Extension
+
+- Crossover scoring endpoint: `POST /api/crossover/score` — scores trends for West Coast -> India resonance.
+- Creator search endpoint: `GET /api/creators/search?platform=instagram|tiktok&q=QUERY&limit=10&minFollowers=0`.
+- Set `APIFY_TOKEN` (or `APIFY_API_TOKEN`) in `.env` to enable creator search via Apify.
+- Optional fallback: set `SERPAPI_API_KEY` to enable SerpAPI-based web discovery of creators when Apify returns few results.
+- TikTok hashtag stats endpoint (Clockworks): `POST /api/tiktok/hashtag-stats` with `{ hashtags: string[], resultsPerPage?: number }` to retrieve per-hashtag summaries (totalViews if provided by actor, sampled plays, top creators). Configure `TIKTOK_HASHTAG_STATS_ACTOR` to change actor (default `clockworks~tiktok-hashtag-scraper`).
 ```
 
 ## 🛠️ Usage Examples

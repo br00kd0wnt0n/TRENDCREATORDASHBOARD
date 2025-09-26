@@ -37,9 +37,14 @@ app.use(express.static(path.join(__dirname, '../../public')));
 
 import { progressManager } from '../utils/progress-manager';
 import { AIEnrichmentService } from '../services/ai-enrichment';
+import { scoreTrends } from '../services/crossover';
+import { CreatorFinderService } from '../services/creator-finder';
+import { fetchInstagramRelatedHashtags } from '../services/related-hashtags';
+import { fetchTikTokHashtagStatsClockworks } from '../services/tiktok-hashtag-stats';
 
 const scraper = new TrendScraper();
 const aiService = new AIEnrichmentService();
+const creatorFinder = new CreatorFinderService();
 
 // Health check endpoints
 app.get('/health', (_req, res) => {
@@ -152,6 +157,22 @@ app.get(['/api/trends/stats', '/api/stats'], async (_req, res) => {
       success: false, 
       error: 'Failed to fetch statistics' 
     });
+  }
+});
+
+// TikTok hashtag stats via Clockworks actor (or configurable)
+app.post('/api/tiktok/hashtag-stats', async (req, res) => {
+  try {
+    const { hashtags = [], resultsPerPage = 20 } = req.body || {};
+    if (!Array.isArray(hashtags) || hashtags.length === 0) {
+      res.status(400).json({ success: false, error: 'Provide hashtags: string[]' });
+      return;
+    }
+    const { summaries } = await fetchTikTokHashtagStatsClockworks(hashtags.map((h: string) => h.replace('#','')), Math.min(100, Math.max(5, parseInt(resultsPerPage))))
+    res.json({ success: true, data: summaries });
+  } catch (error) {
+    logger.error('Failed to fetch TikTok hashtag stats:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch TikTok hashtag stats' });
   }
 });
 
@@ -370,6 +391,176 @@ app.get('/api/scrape/status', (_req, res) => {
   });
 });
 
+// Export trends (last scrape or recent DB) as JSON/CSV, optional crossover scoring
+app.get('/api/scrape/export', async (req, res) => {
+  try {
+    const format = ((req.query.format as string) || 'json').toLowerCase();
+    const source = ((req.query.source as string) || 'last').toLowerCase(); // 'last' | 'db'
+    const timeframe = (req.query.timeframe as string) || '24h';
+    const platforms = ((req.query.platforms as string) || '').split(',').map(s => s.trim()).filter(Boolean);
+    const includeScore = ((req.query.score as string) || 'false').toLowerCase() === 'true';
+
+    let items: any[] = [];
+
+    if (source === 'last') {
+      const s = progressManager.getStatus();
+      if (Array.isArray(s.trends) && s.trends.length) {
+        items = s.trends as any[];
+      }
+      // Fallback to recent DB if empty
+      if (!items.length) {
+        const since = new Date();
+        since.setDate(since.getDate() - 1);
+        const where: any = { scrapedAt: { [Op.gte]: since } };
+        if (platforms.length) where.platform = { [Op.in]: platforms };
+        items = await Trend.findAll({ where, order: [['scrapedAt', 'DESC']], limit: 1000, raw: true });
+      }
+    } else {
+      // From DB by timeframe
+      const since = new Date();
+      if (timeframe === '24h') since.setDate(since.getDate() - 1);
+      else if (timeframe === '7d') since.setDate(since.getDate() - 7);
+      else if (timeframe === '30d') since.setDate(since.getDate() - 30);
+      else since.setDate(since.getDate() - 1);
+      const where: any = { scrapedAt: { [Op.gte]: since } };
+      if (platforms.length) where.platform = { [Op.in]: platforms };
+      items = await Trend.findAll({ where, order: [['scrapedAt', 'DESC']], limit: 2000, raw: true });
+    }
+
+    // Optionally include crossover score/signals (preserves fields by spreading)
+    let out: any[] = items;
+    if (includeScore) {
+      try {
+        out = scoreTrends(items as any) as any[];
+      } catch (e) {
+        logger.warn('Crossover scoring failed during export; returning unscored data');
+      }
+    }
+
+    // Enrich with metrics (volume/rate/growth) similar to top-with-metrics
+    function extractVolume(t: any): number | null {
+      const md = t.metadata || {};
+      if (t.platform === 'Instagram') {
+        if (typeof md.posts_count === 'number') return md.posts_count;
+        const m = String(t.popularity || '').match(/([0-9,.]+)\s*([KkMmBb])?/);
+        if (m) {
+          const n = parseFloat(m[1].replace(/,/g, ''));
+          const unit = (m[2] || '').toUpperCase();
+          const mul = unit === 'B' ? 1e9 : unit === 'M' ? 1e6 : unit === 'K' ? 1e3 : 1;
+          return Math.round(n * mul);
+        }
+      } else if (t.platform === 'TikTok') {
+        const od = md.original_data || {};
+        if (typeof od.video_views === 'number') return od.video_views;
+        if (typeof od.publish_cnt === 'number') return od.publish_cnt;
+        const m = String(t.popularity || '').match(/([0-9,.]+)\s*([KkMmBb])?/);
+        if (m) {
+          const n = parseFloat(m[1].replace(/,/g, ''));
+          const unit = (m[2] || '').toUpperCase();
+          const mul = unit === 'B' ? 1e9 : unit === 'M' ? 1e6 : unit === 'K' ? 1e3 : 1;
+          return Math.round(n * mul);
+        }
+      }
+      return null;
+    }
+    function extractRatePerDay(t: any): number | null {
+      const md = t.metadata || {};
+      if (t.platform === 'Instagram' && typeof md.posts_per_day === 'number') return md.posts_per_day;
+      const od = md.original_data || {};
+      if (typeof od.daily_posts === 'number') return od.daily_posts;
+      if (typeof md.posts_per_day === 'number') return md.posts_per_day;
+      return null;
+    }
+    function formatCompact(n: number | null): string {
+      if (!n && n !== 0) return '';
+      const abs = Math.abs(n as number);
+      if (abs >= 1e9) return `${(abs/1e9).toFixed(1)}B`;
+      if (abs >= 1e6) return `${(abs/1e6).toFixed(1)}M`;
+      if (abs >= 1e3) return `${Math.round(abs/1e3)}K`;
+      return String(abs);
+    }
+
+    const enriched: any[] = [];
+    for (const t of out) {
+      const vol = extractVolume(t);
+      const prev = await Trend.findOne({
+        where: {
+          hashtag: t.hashtag,
+          platform: t.platform,
+          scrapedAt: { [Op.lt]: t.scrapedAt || new Date() }
+        },
+        order: [[ 'scrapedAt', 'DESC' ]],
+        raw: true
+      });
+      const prevVol = prev ? extractVolume(prev) : null;
+      let growth: number | null = null;
+      if (prevVol && vol && prevVol > 0) growth = (vol - prevVol) / prevVol;
+      const ratePerDay = extractRatePerDay(t);
+      enriched.push({
+        ...t,
+        volume: vol,
+        volumeDisplay: formatCompact(vol),
+        ratePerDay,
+        rateDisplay: ratePerDay == null ? '' : `${Math.round(ratePerDay)}/d`,
+        growth,
+        growthDisplay: growth === null ? '' : `${(growth*100).toFixed(growth > -0.1 && growth < 0.1 ? 1 : 0)}%`
+      });
+    }
+    out = enriched;
+
+    // Prepare filename
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const base = `trends_export_${source}_${ts}`;
+
+    if (format === 'csv') {
+      // Flatten records for CSV
+      const rows = out.map((r: any) => ({
+        hashtag: r.hashtag || '',
+        platform: r.platform || '',
+        category: r.category || '',
+        sentiment: r.sentiment || '',
+        confidence: typeof r.confidence === 'number' ? r.confidence : '',
+        crossoverScore: typeof r.crossoverScore === 'number' ? r.crossoverScore : '',
+        westCoast: r.signals?.westCoast ?? '',
+        indiaAffinity: r.signals?.indiaAffinity ?? '',
+        memeability: r.signals?.memeability ?? '',
+        scrapedAt: r.scrapedAt ? new Date(r.scrapedAt).toISOString() : '',
+        volume: r.volume ?? '',
+        volumeDisplay: r.volumeDisplay ?? '',
+        ratePerDay: r.ratePerDay ?? '',
+        rateDisplay: r.rateDisplay ?? '',
+        growth: r.growth ?? '',
+        growthDisplay: r.growthDisplay ?? '',
+        popularity: r.popularity || '',
+        aiInsights: (r.aiInsights || '').toString().replace(/\n/g, ' ')
+      }));
+
+      const headers = Object.keys(rows[0] || { hashtag: '', platform: '', category: '', sentiment: '', confidence: '', crossoverScore: '', westCoast: '', indiaAffinity: '', memeability: '', scrapedAt: '', volume: '', volumeDisplay: '', ratePerDay: '', rateDisplay: '', growth: '', growthDisplay: '', popularity: '', aiInsights: '' });
+      const csv = [headers.join(',')]
+        .concat(rows.map(r => headers.map(h => {
+          const v = (r as any)[h];
+          if (v === null || v === undefined) return '';
+          const s = String(v).replace(/"/g, '""');
+          return /[",\n]/.test(s) ? `"${s}"` : s;
+        }).join(',')))
+        .join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${base}.csv"`);
+      res.send(csv);
+      return;
+    }
+
+    // JSON
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${base}.json"`);
+    res.send(JSON.stringify(out, null, 2));
+  } catch (error) {
+    logger.error('Failed to export trends:', error);
+    res.status(500).json({ success: false, error: 'Failed to export trends' });
+  }
+});
+
 // AI question/follow-up endpoint
 app.post('/api/trends/ask', async (req, res) => {
   try {
@@ -563,6 +754,283 @@ app.get('/api/trending/top', async (_req, res) => {
       success: false, 
       error: 'Failed to fetch top trends' 
     });
+  }
+});
+
+// Top trends with volume and simple growth estimate vs previous record
+app.get('/api/trending/top-with-metrics', async (req, res) => {
+  try {
+    const { platform, timeframe = '24h', limit = 10 } = req.query as any;
+
+    let since = new Date();
+    if (timeframe === '24h') since.setDate(since.getDate() - 1);
+    else if (timeframe === '7d') since.setDate(since.getDate() - 7);
+    else if (timeframe === '30d') since.setDate(since.getDate() - 30);
+
+    const whereClause: any = { scrapedAt: { [Op.gte]: since } };
+    if (platform && platform !== 'all') whereClause.platform = platform;
+
+    const topTrends = await Trend.findAll({
+      where: whereClause,
+      order: [[ 'confidence', 'DESC' ], [ 'scrapedAt', 'DESC' ]],
+      limit: parseInt(limit as string),
+      raw: true
+    });
+
+    function extractVolume(t: any): number | null {
+      // Instagram: metadata.posts_count; TikTok: metadata.original_data.video_views or publish_cnt
+      const md = t.metadata || {};
+      if (t.platform === 'Instagram') {
+        if (typeof md.posts_count === 'number') return md.posts_count;
+        // Fallback: parse popularity like "1.4M posts"
+        const m = String(t.popularity || '').match(/([0-9,.]+)\s*([KkMmBb])?/);
+        if (m) {
+          const n = parseFloat(m[1].replace(/,/g, ''));
+          const unit = (m[2] || '').toUpperCase();
+          const mul = unit === 'B' ? 1e9 : unit === 'M' ? 1e6 : unit === 'K' ? 1e3 : 1;
+          return Math.round(n * mul);
+        }
+      } else if (t.platform === 'TikTok') {
+        const od = md.original_data || {};
+        if (typeof od.video_views === 'number') return od.video_views;
+        if (typeof od.publish_cnt === 'number') return od.publish_cnt;
+        // Parse popularity string if present
+        const m = String(t.popularity || '').match(/([0-9,.]+)\s*([KkMmBb])?/);
+        if (m) {
+          const n = parseFloat(m[1].replace(/,/g, ''));
+          const unit = (m[2] || '').toUpperCase();
+          const mul = unit === 'B' ? 1e9 : unit === 'M' ? 1e6 : unit === 'K' ? 1e3 : 1;
+          return Math.round(n * mul);
+        }
+      }
+      return null;
+    }
+
+    function extractRatePerDay(t: any): number | null {
+      const md = t.metadata || {};
+      // Instagram actor provides posts_per_day
+      if (t.platform === 'Instagram' && typeof md.posts_per_day === 'number') return md.posts_per_day;
+      // TikTok: if future actor provides daily_posts or posts_per_day
+      const od = md.original_data || {};
+      if (typeof od.daily_posts === 'number') return od.daily_posts;
+      if (typeof md.posts_per_day === 'number') return md.posts_per_day;
+      return null;
+    }
+
+    function formatCompact(n: number | null): string {
+      if (!n && n !== 0) return '';
+      const abs = Math.abs(n as number);
+      if (abs >= 1e9) return `${(abs/1e9).toFixed(1)}B`;
+      if (abs >= 1e6) return `${(abs/1e6).toFixed(1)}M`;
+      if (abs >= 1e3) return `${Math.round(abs/1e3)}K`;
+      return String(abs);
+    }
+
+    const withMetrics = [] as any[];
+    for (const t of topTrends) {
+      const vol = extractVolume(t);
+      // Find previous record for same hashtag/platform
+      const prev = await Trend.findOne({
+        where: {
+          hashtag: t.hashtag,
+          platform: t.platform,
+          scrapedAt: { [Op.lt]: t.scrapedAt }
+        },
+        order: [[ 'scrapedAt', 'DESC' ]],
+        raw: true
+      });
+      const prevVol = prev ? extractVolume(prev) : null;
+      const ratePerDay = extractRatePerDay(t);
+      let growth: number | null = null;
+      if (prevVol && vol && prevVol > 0) {
+        growth = (vol - prevVol) / prevVol; // fraction
+      }
+      withMetrics.push({
+        ...t,
+        volume: vol,
+        volumeDisplay: formatCompact(vol),
+        growth,
+        growthDisplay: growth === null ? '' : `${(growth*100).toFixed(growth > -0.1 && growth < 0.1 ? 1 : 0)}%`,
+        ratePerDay,
+        rateDisplay: ratePerDay == null ? '' : `${Math.round(ratePerDay)}/d`
+      });
+    }
+
+    res.json({ success: true, data: withMetrics, timeframe, platform: platform || 'all' });
+  } catch (error) {
+    logger.error('Failed to fetch top trends with metrics:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch top trends with metrics' });
+  }
+});
+
+// Crossover scoring endpoint: score provided trends for West-Coast -> India resonance
+app.post('/api/crossover/score', async (req, res) => {
+  try {
+    const { trends } = req.body || {};
+    if (!Array.isArray(trends)) {
+      res.status(400).json({ success: false, error: 'Body must include trends: TrendLike[]' });
+      return;
+    }
+    const scored = scoreTrends(trends);
+    res.json({ success: true, data: scored });
+  } catch (error) {
+    logger.error('Failed to score crossover trends:', error);
+    res.status(500).json({ success: false, error: 'Failed to score trends' });
+  }
+});
+
+// Creator search endpoint: find creators by platform + query
+app.get('/api/creators/search', async (req, res) => {
+  try {
+    const platform = (req.query.platform as string || '').toLowerCase();
+    const q = (req.query.q as string || '').trim();
+    const limit = parseInt((req.query.limit as string) || '10');
+    const minFollowers = parseInt((req.query.minFollowers as string) || '0');
+
+    if (!platform) {
+      res.status(400).json({ success: false, error: 'platform required (instagram|tiktok|both)' });
+      return;
+    }
+    if (!q) {
+      res.status(400).json({ success: false, error: 'q (query) is required' });
+      return;
+    }
+
+    if (platform === 'both' || platform === 'all') {
+      const [ig, tt] = await Promise.all([
+        creatorFinder.searchCreators({ platform: 'instagram', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined }),
+        creatorFinder.searchCreators({ platform: 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined })
+      ]);
+      const merged = [...ig, ...tt];
+      res.json({ success: true, data: merged });
+      return;
+    }
+
+    if (!['instagram','tiktok'].includes(platform)) {
+      res.status(400).json({ success: false, error: 'platform must be instagram or tiktok or both' });
+      return;
+    }
+
+    const creators = await creatorFinder.searchCreators({ platform: platform as 'instagram' | 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined });
+    res.json({ success: true, data: creators });
+  } catch (error) {
+    logger.error('Failed to search creators:', error);
+    res.status(500).json({ success: false, error: 'Failed to search creators' });
+  }
+});
+
+// Discover creators from current trend seeds (via creator search fallback over seeds)
+app.post('/api/creators/discover', async (req, res) => {
+  try {
+    const { platforms = ['instagram','tiktok'], seeds = [], perPlatform = 10, minFollowers = 0 } = req.body || {};
+    if (!Array.isArray(seeds) || seeds.length === 0) {
+      res.status(400).json({ success: false, error: 'Provide seeds: string[] (hashtags/keywords)' });
+      return;
+    }
+
+    const targetPlatforms: Array<'instagram'|'tiktok'> = (Array.isArray(platforms) ? platforms : []).filter((p: string) => ['instagram','tiktok'].includes((p||'').toLowerCase())).map((p: string) => p.toLowerCase() as 'instagram'|'tiktok');
+    if (!targetPlatforms.length) {
+      res.status(400).json({ success: false, error: 'platforms must include instagram and/or tiktok' });
+      return;
+    }
+
+    const out: Record<string, any[]> = {};
+
+    // Optionally expand Instagram seeds via related hashtags
+    let igSeeds = seeds;
+    try {
+      if (targetPlatforms.includes('instagram')) {
+        const expanded = await fetchInstagramRelatedHashtags(seeds, 20);
+        igSeeds = Array.from(new Set([...seeds, ...expanded.map(e => e.hashtag.replace('#',''))]));
+      }
+    } catch (e) {
+      logger.warn('Seed expansion failed, continuing with original seeds');
+    }
+
+    for (const plat of targetPlatforms) {
+      const uniq = new Map<string, any>();
+      const useSeeds = plat === 'instagram' ? igSeeds : seeds;
+      for (const s of useSeeds) {
+        const q = s.toString().replace(/^#/, '');
+        const creators = await creatorFinder.searchCreators({ platform: plat, query: q, limit: Math.max(5, perPlatform), minFollowers });
+        for (const c of creators) {
+          const key = `${c.platform}:${(c.handle||'').toLowerCase()}`;
+          if (!uniq.has(key)) uniq.set(key, c);
+          if (uniq.size >= perPlatform) break;
+        }
+        if (uniq.size >= perPlatform) break;
+      }
+      out[plat] = Array.from(uniq.values());
+    }
+
+    res.json({ success: true, data: out });
+  } catch (error) {
+    logger.error('Failed to discover creators from trends:', error);
+    res.status(500).json({ success: false, error: 'Failed to discover creators' });
+  }
+});
+
+// Related hashtags from seed trends/keywords
+app.post('/api/hashtags/related', async (req, res) => {
+  try {
+    const { platform = 'instagram', hashtags = [], limit = 12, timeframe = '7d' } = req.body || {};
+    if (!Array.isArray(hashtags) || hashtags.length === 0) {
+      res.status(400).json({ success: false, error: 'Provide hashtags: string[]' });
+      return;
+    }
+
+    if (platform === 'instagram') {
+      const out = await fetchInstagramRelatedHashtags(hashtags, Math.min(30, Math.max(3, parseInt(limit))));
+      res.json({ success: true, data: out });
+      return;
+    }
+
+    if (platform === 'tiktok') {
+      // Fallback related suggestion: use recent TikTok trends from DB and filter by seed fragments
+      let since = new Date();
+      if (timeframe === '24h') since.setDate(since.getDate() - 1);
+      else if (timeframe === '30d') since.setDate(since.getDate() - 30);
+      else since.setDate(since.getDate() - 7);
+
+      const recent = await Trend.findAll({
+        where: {
+          platform: 'TikTok',
+          scrapedAt: { [Op.gte]: since }
+        },
+        order: [[ 'confidence', 'DESC' ], [ 'scrapedAt', 'DESC' ]],
+        limit: 200,
+        raw: true
+      });
+
+      const seedTerms = (hashtags as string[])
+        .map(h => h.toString().toLowerCase().replace(/[#\s]/g, ''))
+        .filter(Boolean);
+
+      const seen = new Set<string>();
+      const matched: any[] = [];
+      const others: any[] = [];
+
+      for (const r of recent) {
+        const tag = (r.hashtag || '').toString();
+        if (!tag) continue;
+        const norm = tag.toLowerCase();
+        if (seen.has(norm)) continue;
+        seen.add(norm);
+        const match = seedTerms.some(s => norm.includes(s));
+        const item = { hashtag: tag, popularity: undefined as any, source: match ? 'seed_match' : 'trending_db' };
+        if (typeof r.popularity === 'string') item.popularity = r.popularity;
+        (match ? matched : others).push(item);
+      }
+
+      const out = [...matched, ...others].slice(0, Math.min(30, Math.max(3, parseInt(limit))));
+      res.json({ success: true, data: out });
+      return;
+    }
+
+    res.status(400).json({ success: false, error: 'platform must be instagram or tiktok' });
+  } catch (error) {
+    logger.error('Failed to fetch related hashtags:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch related hashtags' });
   }
 });
 
@@ -835,6 +1303,11 @@ async function generateIntelBriefing() {
 // Serve dashboard HTML
 app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, '../../public/index.html'));
+});
+
+// Serve Amazon Prime India extension UI
+app.get(['/prime-india', '/extension/prime-india'], (_req, res) => {
+  res.sendFile(path.join(__dirname, '../../public/prime-india.html'));
 });
 
 // Error handling middleware
