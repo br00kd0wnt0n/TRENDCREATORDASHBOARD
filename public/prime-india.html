@@ -51,6 +51,11 @@
     .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; font-size: 12px; }
     .counts { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 100; }
+    .modal { width: min(820px, 92vw); max-height: 80vh; overflow: auto; background: #0f172a; border: 1px solid #1f2937; border-radius: 10px; padding: 16px; color: var(--text); }
+    .modal h3 { margin: 0 0 8px 0; font-size: 16px; }
+    .modal .hint { color: var(--muted); }
+    .modal .row { justify-content: space-between; }
   </style>
   <script>
     function compactNumber(n) {
@@ -556,6 +561,15 @@
         if (!pop || !grp) return;
         if (!grp.contains(ev.target)) closeExportOptions();
       });
+
+      // Help modal
+      const helpBtn = document.getElementById('helpBtn');
+      const helpModal = document.getElementById('helpModal');
+      const helpClose = document.getElementById('helpClose');
+      helpBtn?.addEventListener('click', () => { helpModal.style.display = 'flex'; });
+      helpClose?.addEventListener('click', () => { helpModal.style.display = 'none'; });
+      helpModal?.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.style.display = 'none'; });
+
       loadTrends();
     });
   </script>
@@ -569,6 +583,7 @@
         
       </div>
       <div class="row">
+        <button id="helpBtn" class="secondary" title="How to use">Help</button>
         <a href="/" class="hint">Back to main dashboard</a>
       </div>
     </header>
@@ -705,5 +720,54 @@
       </div>
     </div>
   </div>
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal-backdrop" style="display:none;">
+    <div class="modal">
+      <div class="row">
+        <h3>How To Use – Prime India Trend Spotter</h3>
+        <button id="helpClose" class="secondary">Close</button>
+      </div>
+      <div class="hint">A quick guide to the focused workflow.</div>
+      <div style="margin-top:10px;">
+        <h4>1) Refresh & Scrape</h4>
+        <ul>
+          <li>Timeframe controls the window (24h/7d/30d). If 24h is sparse, try 7d.</li>
+          <li>Refresh pulls latest trends from the DB and re-scores.</li>
+          <li>Run Scrape (IG+TikTok) starts a fresh scrape and updates the list when done.</li>
+          <li>Run IG Only triggers the Instagram Stats actor (use if IG rate is empty).</li>
+        </ul>
+        <h4>2) Candidate Trends</h4>
+        <ul>
+          <li>Score 0.00–1.00 ranks crossover fit for “In Our Prime”.</li>
+          <li>Inline tags show platform, category, sentiment, volume (vol), posts/day (rate), and growth (Δ) when available.</li>
+          <li>IG/TT counts above the list show coverage by platform.</li>
+        </ul>
+        <h4>3) Creator Finder</h4>
+        <ul>
+          <li>Search Creators: choose platform (or Both), enter a query (e.g., “bollywood dance”), set Min Followers, and optionally Include unknown.</li>
+          <li>Discover from Trending Posts: uses top trend hashtags as seeds to find active creators; respects Min Followers and Include unknown.</li>
+          <li>Cards show avatar, followers, engagement (if known), location, categories, and a quick bio.</li>
+        </ul>
+        <h4>4) Related Hashtags</h4>
+        <ul>
+          <li>Enter comma-separated seeds and choose platform (Instagram/TikTok).</li>
+          <li>Find Related returns adjacent/related hashtags for seeding and exploration.</li>
+        </ul>
+        <h4>5) Export</h4>
+        <ul>
+          <li>Export CSV (defaults to Last Scrape, IG+TikTok, includes crossover score).</li>
+          <li>Use Options to switch source/timeframe/platforms or toggle score.</li>
+          <li>CSV includes volume, rate, and growth fields for tuning.</li>
+        </ul>
+        <h4>Tips</h4>
+        <ul>
+          <li>If TikTok doesn’t appear in 24h, widen to 7d or run a fresh scrape.</li>
+          <li>For more IG rates, use “Run IG Only”. For TT daily rates, we can add a stats actor later.</li>
+          <li>Provider status (Apify/SerpAPI) shows in Creator Finder while searching.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
