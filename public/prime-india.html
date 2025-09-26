@@ -380,7 +380,8 @@
             status.textContent = status.textContent + ` (providers: apify=${pj?.data?.apify ? 'on':'off'}, serpapi=${pj?.data?.serpapi ? 'on':'off'})`;
           }
         } catch {}
-        const resp = await fetch(`/api/creators/search?platform=${encodeURIComponent(platform)}&q=${encodeURIComponent(q)}&limit=${limit}&minFollowers=${minFollowers}`);
+        const includeUnknown = document.getElementById('cincunknown')?.checked ? 'true' : 'false';
+        const resp = await fetch(`${API_BASE}/api/creators/search?platform=${encodeURIComponent(platform)}&q=${encodeURIComponent(q)}&limit=${limit}&minFollowers=${minFollowers}&includeUnknown=${includeUnknown}`);
         if (!resp.ok) { status.textContent = `Search failed (${resp.status})`; return; }
         const data = await resp.json();
         const list = document.getElementById('clist');

@@ -8,6 +8,7 @@ export interface CreatorSearchParams {
   limit?: number;
   minFollowers?: number;
   regionHint?: string; // e.g., 'IN' or 'west_coast'
+  includeUnknown?: boolean; // include creators without numeric follower counts when threshold > 0
 }
 
 export interface CreatorDiscoveryParams {
@@ -16,6 +17,7 @@ export interface CreatorDiscoveryParams {
   limit?: number;
   minFollowers?: number;
   maxHashtags?: number;
+  includeUnknown?: boolean;
 }
 
 export interface CreatorProfile {
@@ -41,7 +43,7 @@ export class CreatorFinderService {
   }
 
   async searchCreators(params: CreatorSearchParams): Promise<CreatorProfile[]> {
-    const { platform, query, limit = 10, minFollowers = 0 } = params;
+    const { platform, query, limit = 10, minFollowers = 0, includeUnknown = false } = params;
 
     const results: CreatorProfile[] = [];
     try {
@@ -74,8 +76,15 @@ export class CreatorFinderService {
         }
       }
 
-      // Min followers filter (only applies when we have numbers)
-      return results.filter(r => (r.followers ?? minFollowers) >= minFollowers).slice(0, limit);
+      // Min followers filter: if threshold > 0, require numeric followers unless includeUnknown
+      const filtered = results.filter(r => {
+        if (minFollowers > 0) {
+          if (typeof r.followers === 'number') return r.followers >= minFollowers;
+          return includeUnknown; // allow unknown if requested
+        }
+        return true;
+      });
+      return filtered.slice(0, limit);
     } catch (e: any) {
       console.error('CREATOR-FINDER ERROR:', {
         platform,
@@ -229,7 +238,7 @@ export class CreatorFinderService {
   }
 
   async discoverCreators(params: CreatorDiscoveryParams): Promise<CreatorProfile[]> {
-    const { seeds, platforms = ['instagram', 'tiktok'], limit = 20, minFollowers = 0, maxHashtags = 8 } = params;
+    const { seeds, platforms = ['instagram', 'tiktok'], limit = 20, minFollowers = 0, maxHashtags = 8, includeUnknown = false } = params;
 
     logger.info(`Discovering creators from seeds: ${seeds.join(', ')}`);
 
@@ -288,7 +297,13 @@ export class CreatorFinderService {
     }
 
     const results = Array.from(creators.values())
-      .filter(c => (c.followers ?? 0) >= minFollowers)
+      .filter(c => {
+        if (minFollowers > 0) {
+          if (typeof c.followers === 'number') return c.followers >= minFollowers;
+          return includeUnknown;
+        }
+        return true;
+      })
       .sort((a, b) => (b.followers ?? 0) - (a.followers ?? 0))
       .slice(0, limit);
 

@@ -886,6 +886,7 @@ app.get('/api/creators/search', async (req, res) => {
     const q = (req.query.q as string || '').trim();
     const limit = parseInt((req.query.limit as string) || '10');
     const minFollowers = parseInt((req.query.minFollowers as string) || '0');
+    const includeUnknown = ((req.query.includeUnknown as string) || 'false').toLowerCase() === 'true';
     logger.info(`[Creators/Search] platform=${platform} q="${q}" limit=${limit} minFollowers=${minFollowers}`);
     // ensure visibility even if logger level is high
     console.log('[Creators/Search]', { platform, q, limit, minFollowers, serpapi: !!process.env.SERPAPI_API_KEY, apify: !!(process.env.APIFY_TOKEN || process.env.APIFY_API_TOKEN || process.env.APIFY_API_KEY) });
@@ -901,8 +902,8 @@ app.get('/api/creators/search', async (req, res) => {
 
     if (platform === 'both' || platform === 'all') {
       const [ig, tt] = await Promise.all([
-        creatorFinder.searchCreators({ platform: 'instagram', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined }),
-        creatorFinder.searchCreators({ platform: 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined })
+        creatorFinder.searchCreators({ platform: 'instagram', query: q, limit: Math.min(limit, 25), minFollowers, includeUnknown, regionHint: req.query.region as string | undefined }),
+        creatorFinder.searchCreators({ platform: 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, includeUnknown, regionHint: req.query.region as string | undefined })
       ]);
       const merged = [...ig, ...tt];
       logger.info(`[Creators/Search] results both: IG=${ig.length} TT=${tt.length} total=${merged.length}`);
@@ -916,7 +917,7 @@ app.get('/api/creators/search', async (req, res) => {
       return;
     }
 
-    const creators = await creatorFinder.searchCreators({ platform: platform as 'instagram' | 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined });
+    const creators = await creatorFinder.searchCreators({ platform: platform as 'instagram' | 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, includeUnknown, regionHint: req.query.region as string | undefined });
     logger.info(`[Creators/Search] results ${platform}: ${creators.length}`);
     console.log('[Creators/Search] results', platform, creators.length);
     res.json({ success: true, data: creators, meta: { [platform]: creators.length } });
@@ -948,7 +949,7 @@ app.get('/api/creators/test', (req, res) => {
 // Discover creators from current trend seeds (via creator search fallback over seeds)
 app.post('/api/creators/discover', async (req, res) => {
   try {
-    const { platforms = ['instagram','tiktok'], seeds = [], perPlatform = 10, minFollowers = 0 } = req.body || {};
+    const { platforms = ['instagram','tiktok'], seeds = [], perPlatform = 10, minFollowers = 0, includeUnknown = false } = req.body || {};
     logger.info(`[Creators/Discover] platforms=${platforms.join('+')} seeds=${seeds.length} minFollowers=${minFollowers}`);
     if (!Array.isArray(seeds) || seeds.length === 0) {
       res.status(400).json({ success: false, error: 'Provide seeds: string[] (hashtags/keywords)' });
@@ -979,7 +980,7 @@ app.post('/api/creators/discover', async (req, res) => {
       const useSeeds = plat === 'instagram' ? igSeeds : seeds;
       for (const s of useSeeds) {
         const q = s.toString().replace(/^#/, '');
-        const creators = await creatorFinder.searchCreators({ platform: plat, query: q, limit: Math.max(5, perPlatform), minFollowers });
+        const creators = await creatorFinder.searchCreators({ platform: plat, query: q, limit: Math.max(5, perPlatform), minFollowers, includeUnknown });
         for (const c of creators) {
           const key = `${c.platform}:${(c.handle||'').toLowerCase()}`;
           if (!uniq.has(key)) uniq.set(key, c);
