@@ -48,15 +48,22 @@ export class CreatorFinderService {
       // 1) Try Apify provider if token present
       if (this.token) {
         let apifyResults: CreatorProfile[] = [];
-        if (platform === 'instagram') apifyResults = await this.searchInstagram(query, limit, minFollowers);
-        else if (platform === 'tiktok') apifyResults = await this.searchTikTok(query, limit, minFollowers);
-        results.push(...apifyResults);
+        try {
+          if (platform === 'instagram') apifyResults = await this.searchInstagram(query, limit, minFollowers);
+          else if (platform === 'tiktok') apifyResults = await this.searchTikTok(query, limit, minFollowers);
+          results.push(...apifyResults);
+          console.log(`APIFY ${platform} success: ${apifyResults.length} results`);
+        } catch (e: any) {
+          console.log(`APIFY ${platform} failed, falling back to SerpAPI:`, e?.message);
+          // Don't throw - let SerpAPI fallback handle it
+        }
       } else {
         logger.warn('No Apify token present; skipping Apify creator search');
       }
 
       // 2) Fallback: SerpAPI search if available, fill gaps, then de-dup
       if (results.length < limit && this.serpApiKey) {
+        console.log(`SERPAPI ${platform} fallback: need ${limit - results.length} more results`);
         const needed = limit - results.length;
         const serp = await this.searchViaSerpAPI(platform, query, needed);
         // Merge by handle/platform
@@ -70,6 +77,15 @@ export class CreatorFinderService {
       // Min followers filter (only applies when we have numbers)
       return results.filter(r => (r.followers ?? minFollowers) >= minFollowers).slice(0, limit);
     } catch (e: any) {
+      console.error('CREATOR-FINDER ERROR:', {
+        platform,
+        query,
+        errorMessage: e?.message,
+        errorResponse: e?.response?.data,
+        errorStack: e?.stack?.split('\n')[0],
+        hasApifyToken: !!this.token,
+        hasSerpApiKey: !!this.serpApiKey
+      });
       logger.error('Creator search failed', e?.response?.data || e?.message || e);
       return results.slice(0, limit);
     }
