@@ -53,8 +53,10 @@
     .counts { font-size: 12px; color: var(--muted); margin: 4px 0 6px; }
   </style>
   <script>
+    let API_BASE = '';
     async function fetchJSON(url, opts = {}) {
-      const res = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers||{}) } });
+      const finalUrl = url.startsWith('/api/') ? (API_BASE + url) : url;
+      const res = await fetch(finalUrl, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers||{}) } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     }
@@ -79,7 +81,7 @@
     async function applyCrossoverScoring() {
       try {
         const payload = { trends: state.trends };
-        const res = await fetch('/api/crossover/score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const res = await fetch(API_BASE + '/api/crossover/score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!res.ok) return;
         const data = await res.json();
         if (Array.isArray(data?.data)) state.trends = data.data;
@@ -204,7 +206,7 @@
     let scrapeTimer = null;
     async function getScrapeStatus() {
       try {
-        const r = await fetch('/api/scrape/status');
+        const r = await fetch(API_BASE + '/api/scrape/status');
         if (!r.ok) return null;
         const j = await r.json();
         return j?.data || null;
@@ -246,7 +248,7 @@
       btn.disabled = true; btn.textContent = 'Starting…';
       try {
         setScrapeInfo('Scheduling scrape…');
-        const r = await fetch('/api/scrape', {
+        const r = await fetch(API_BASE + '/api/scrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platforms: ['Instagram','TikTok'] })
@@ -270,7 +272,7 @@
       btn.disabled = true; btn.textContent = 'Starting…';
       try {
         setScrapeInfo('Scheduling Instagram scrape…');
-        const r = await fetch('/api/scrape', {
+        const r = await fetch(API_BASE + '/api/scrape', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platforms: ['Instagram'] })
@@ -348,16 +350,37 @@
       const btn = document.getElementById('creatorSearchBtn');
       btn.disabled = true; btn.textContent = 'Searching…';
       try {
+        const status = document.getElementById('clStatus');
         const platform = document.getElementById('cplat').value;
-        const q = document.getElementById('cquery').value;
+        const q = (document.getElementById('cquery').value || '').trim();
         const minFollowers = parseInt(document.getElementById('cmin').value || '0');
         const limit = 10;
-        const data = await fetchJSON(`/api/creators/search?platform=${encodeURIComponent(platform)}&q=${encodeURIComponent(q)}&limit=${limit}&minFollowers=${minFollowers}`);
+        if (!q) { status.textContent = 'Enter a search query'; return; }
+        status.textContent = `Searching ${platform} for "${q}"…`;
+        try {
+          const provResp = await fetch(API_BASE + '/api/creators/providers');
+          if (provResp.ok) {
+            const pj = await provResp.json();
+            status.textContent = status.textContent + ` (providers: apify=${pj?.data?.apify ? 'on':'off'}, serpapi=${pj?.data?.serpapi ? 'on':'off'})`;
+          }
+        } catch {}
+        try { await fetch(API_BASE + '/api/creators/test?q=ping'); } catch {}
+        try {
+          const provResp = await fetch(API_BASE + '/api/creators/providers');
+          if (provResp.ok) {
+            const pj = await provResp.json();
+            status.textContent = status.textContent + ` (providers: apify=${pj?.data?.apify ? 'on':'off'}, serpapi=${pj?.data?.serpapi ? 'on':'off'})`;
+          }
+        } catch {}
+        const resp = await fetch(`/api/creators/search?platform=${encodeURIComponent(platform)}&q=${encodeURIComponent(q)}&limit=${limit}&minFollowers=${minFollowers}`);
+        if (!resp.ok) { status.textContent = `Search failed (${resp.status})`; return; }
+        const data = await resp.json();
         const list = document.getElementById('clist');
         list.innerHTML = '';
         const items = Array.isArray(data.data) ? data.data : [];
         if (items.length === 0) {
           list.innerHTML = '<div class="empty">No creators found. Try a broader query or lower min followers.</div>';
+          status.textContent = 'No creators found';
           return;
         }
         const frag = document.createDocumentFragment();
@@ -382,9 +405,11 @@
           frag.appendChild(el);
         });
         list.appendChild(frag);
+        status.textContent = `Found ${items.length} creators`;
       } catch (e) {
         console.error(e);
-        alert('Creator search failed');
+        const status = document.getElementById('clStatus');
+        status.textContent = 'Creator search failed';
       } finally {
         btn.disabled = false; btn.textContent = 'Search Creators';
       }
@@ -394,13 +419,15 @@
       const btn = document.getElementById('discoverBtn');
       btn.disabled = true; const old = btn.textContent; btn.textContent = 'Discovering…';
       try {
+        const status = document.getElementById('clStatus');
         const top = (state.filtered.length ? state.filtered : state.trends).slice(0, 12);
         const seeds = top.map(t => (t.hashtag || '').replace('#','')).filter(Boolean);
-        if (!seeds.length) { alert('No trend seeds available yet. Try Refresh or Run Scrape.'); return; }
+        if (!seeds.length) { status.textContent = 'No trend seeds available yet. Try Refresh or Run Scrape.'; return; }
         const platSel = document.getElementById('cplat').value;
         const platforms = platSel === 'both' ? ['instagram','tiktok'] : (platSel === 'instagram' ? ['instagram'] : ['tiktok']);
+        status.textContent = `Discovering from ${platforms.join(' + ')} using ${seeds.length} seeds…`;
         const minFollowers = parseInt(document.getElementById('cmin')?.value || '0');
-        const res = await fetch('/api/creators/discover', {
+        const res = await fetch(API_BASE + '/api/creators/discover', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platforms, seeds, limit: 20, minFollowers, maxHashtags: 8 })
         });
@@ -418,6 +445,7 @@
         }
         if (!creators.length) {
           list.innerHTML = '<div class="empty">No creators discovered from trending posts. These are creators actively posting in the hashtags related to your top trends.</div>';
+          status.textContent = 'No creators discovered';
           return;
         }
         const frag = document.createDocumentFragment();
@@ -442,9 +470,11 @@
           frag.appendChild(el);
         });
         list.appendChild(frag);
+        status.textContent = `Discovered ${creators.length} creators`;
       } catch (e) {
         console.error(e);
-        alert('Creator discovery failed: ' + e.message);
+        const status = document.getElementById('clStatus');
+        status.textContent = 'Creator discovery failed';
       } finally {
         btn.disabled = false; btn.textContent = old;
       }
@@ -458,7 +488,7 @@
         const raw = (document.getElementById('relInput').value || '').trim();
         if (!raw) { alert('Enter comma-separated keywords/hashtags'); return; }
         const seeds = raw.split(',').map(s => s.trim()).filter(Boolean);
-        const res = await fetch('/api/hashtags/related', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ platform: plat, hashtags: seeds, limit: 24 })});
+        const res = await fetch(API_BASE + '/api/hashtags/related', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ platform: plat, hashtags: seeds, limit: 24 })});
         if (!res.ok) throw new Error('HTTP '+res.status);
         const data = await res.json();
         const box = document.getElementById('relOut');
@@ -473,7 +503,14 @@
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Determine API base: try same-origin first, else fallback to :30003
+      try {
+        const test = await fetch('/api/trending/top?timeframe=24h&limit=1');
+        if (test.ok) { API_BASE = ''; } else { throw new Error('bad'); }
+      } catch {
+        API_BASE = `${location.protocol}//${location.hostname}:30003`;
+      }
       document.getElementById('timeframe').addEventListener('change', e => { state.timeframe = e.target.value; loadTrends(); });
       document.getElementById('platform').addEventListener('change', e => { state.platform = e.target.value; renderList(); });
       document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; renderList(); });
@@ -576,8 +613,9 @@
     <div class="grid">
       <div class="panel">
         <h3>Candidate Trends (Crossover-Scored)</h3>
-        <div class="hint">Score 0.00–1.00 · higher = stronger crossover fit for “In Our Prime” based on IG/TikTok memeability, India audience resonance, platform fit, clarity, and recency. Generic/old commercial or greeting tags are down‑weighted.</div>
-        <div id="platCounts" class="counts">IG: — · TikTok: — · Total: —</div>
+        <div class="hint">Score 0.00–1.00 · higher = stronger crossover fit for "In Our Prime" based on IG/TikTok memeability, India audience resonance, platform fit, clarity, and recency.</div>
+        <div class="hint" style="margin-top: 4px;">Generic/old commercial or greeting tags are down‑weighted.</div>
+        <div id="platCounts" class="counts" style="margin-top: 8px;">IG: — · TikTok: — · Total: —</div>
         <div id="list" class="list"></div>
       </div>
       <div class="panel">
@@ -613,6 +651,7 @@
             <button id="creatorSearchBtn">Search Creators</button>
           </div>
         </div>
+        <div id="clStatus" class="hint" style="margin-top:6px;">Status: idle</div>
         <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px;">
           <div class="hint">Or discover creators actively posting in trend hashtags:</div>
           <button id="discoverBtn" class="accent2">Discover from Trending Posts</button>
@@ -621,6 +660,7 @@
       </div>
       <div class="panel">
         <h3>Related Hashtags</h3>
+        <div class="hint" style="margin-bottom: 10px;">Enter seeds and tap Find Related to fetch Instagram related/adjacent hashtags via Apify.</div>
         <div class="row" style="gap:10px;flex-wrap:wrap;">
           <div style="flex: 1 1 160px;">
             <label class="hint">Platform</label>
@@ -637,7 +677,7 @@
             <button id="relBtn">Find Related</button>
           </div>
         </div>
-        <div id="relOut" class="aiout mono" style="margin-top:10px; min-height: 120px;">Enter seeds and tap Find Related to fetch Instagram related/adjacent hashtags via Apify.</div>
+        <div id="relOut" class="aiout mono" style="margin-top:10px; min-height: 120px;"></div>
       </div>
     </div>
   </div>

@@ -886,6 +886,9 @@ app.get('/api/creators/search', async (req, res) => {
     const q = (req.query.q as string || '').trim();
     const limit = parseInt((req.query.limit as string) || '10');
     const minFollowers = parseInt((req.query.minFollowers as string) || '0');
+    logger.info(`[Creators/Search] platform=${platform} q="${q}" limit=${limit} minFollowers=${minFollowers}`);
+    // ensure visibility even if logger level is high
+    console.log('[Creators/Search]', { platform, q, limit, minFollowers, serpapi: !!process.env.SERPAPI_API_KEY, apify: !!(process.env.APIFY_TOKEN || process.env.APIFY_API_TOKEN || process.env.APIFY_API_KEY) });
 
     if (!platform) {
       res.status(400).json({ success: false, error: 'platform required (instagram|tiktok|both)' });
@@ -902,7 +905,9 @@ app.get('/api/creators/search', async (req, res) => {
         creatorFinder.searchCreators({ platform: 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined })
       ]);
       const merged = [...ig, ...tt];
-      res.json({ success: true, data: merged });
+      logger.info(`[Creators/Search] results both: IG=${ig.length} TT=${tt.length} total=${merged.length}`);
+      console.log('[Creators/Search] results both', { ig: ig.length, tt: tt.length, total: merged.length });
+      res.json({ success: true, data: merged, meta: { ig: ig.length, tt: tt.length } });
       return;
     }
 
@@ -912,17 +917,39 @@ app.get('/api/creators/search', async (req, res) => {
     }
 
     const creators = await creatorFinder.searchCreators({ platform: platform as 'instagram' | 'tiktok', query: q, limit: Math.min(limit, 25), minFollowers, regionHint: req.query.region as string | undefined });
-    res.json({ success: true, data: creators });
+    logger.info(`[Creators/Search] results ${platform}: ${creators.length}`);
+    console.log('[Creators/Search] results', platform, creators.length);
+    res.json({ success: true, data: creators, meta: { [platform]: creators.length } });
   } catch (error) {
     logger.error('Failed to search creators:', error);
+    console.error('[Creators/Search] error', error);
     res.status(500).json({ success: false, error: 'Failed to search creators' });
   }
+});
+
+// Creator providers status (for debugging UI)
+app.get('/api/creators/providers', (_req, res) => {
+  try {
+    const apify = !!(process.env.APIFY_TOKEN || process.env.APIFY_API_TOKEN || process.env.APIFY_API_KEY);
+    const serpapi = !!process.env.SERPAPI_API_KEY;
+    res.json({ success: true, data: { apify, serpapi } });
+  } catch (error) {
+    res.json({ success: true, data: { apify: false, serpapi: false } });
+  }
+});
+
+// Simple test endpoint to verify request path and logging
+app.get('/api/creators/test', (req, res) => {
+  const q = (req.query.q as string) || '';
+  console.log('[Creators/Test] received', { q });
+  res.json({ success: true, data: { q, ts: new Date().toISOString() } });
 });
 
 // Discover creators from current trend seeds (via creator search fallback over seeds)
 app.post('/api/creators/discover', async (req, res) => {
   try {
     const { platforms = ['instagram','tiktok'], seeds = [], perPlatform = 10, minFollowers = 0 } = req.body || {};
+    logger.info(`[Creators/Discover] platforms=${platforms.join('+')} seeds=${seeds.length} minFollowers=${minFollowers}`);
     if (!Array.isArray(seeds) || seeds.length === 0) {
       res.status(400).json({ success: false, error: 'Provide seeds: string[] (hashtags/keywords)' });
       return;
@@ -963,7 +990,9 @@ app.post('/api/creators/discover', async (req, res) => {
       out[plat] = Array.from(uniq.values());
     }
 
-    res.json({ success: true, data: out });
+    const igCount = (out.instagram || []).length; const ttCount = (out.tiktok || []).length;
+    logger.info(`[Creators/Discover] results IG=${igCount} TT=${ttCount}`);
+    res.json({ success: true, data: out, meta: { ig: igCount, tt: ttCount } });
   } catch (error) {
     logger.error('Failed to discover creators from trends:', error);
     res.status(500).json({ success: false, error: 'Failed to discover creators' });

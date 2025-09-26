@@ -157,7 +157,12 @@ export class CreatorFinderService {
       const params = new URLSearchParams({
         engine: 'google',
         q: `${site} ${query}`,
-        num: String(Math.min(20, Math.max(5, limit * 3))),
+        num: String(Math.min(50, Math.max(10, limit * 5))),
+        hl: 'en',
+        gl: 'in',
+        google_domain: 'google.com',
+        safe: 'active',
+        location: 'India',
         api_key: this.serpApiKey
       });
       const url = `https://serpapi.com/search.json?${params.toString()}`;
@@ -165,8 +170,9 @@ export class CreatorFinderService {
       const org = res.data?.organic_results || [];
 
       const creators: CreatorProfile[] = [];
-      for (const r of org) {
-        const link: string = r.link || '';
+      // Helper to consider a link
+      const consider = (link: string) => {
+        if (!link) return;
         try {
           const u = new URL(link);
           const host = u.hostname.replace(/^www\./, '');
@@ -176,30 +182,29 @@ export class CreatorFinderService {
             const disallowed = new Set(['p','reel','tv','explore','stories','about','accounts']);
             if (!disallowed.has(first)) {
               const handle = segs[0];
-              creators.push({
-                handle,
-                platform: 'instagram',
-                profileUrl: `https://instagram.com/${handle}`,
-                displayName: r.title,
-                bio: r.snippet
-              });
+              creators.push({ handle, platform: 'instagram', profileUrl: `https://instagram.com/${handle}`, displayName: '', bio: '' });
             }
           }
           if (platform === 'tiktok' && host === 'tiktok.com' && segs.length >= 1) {
             if (segs[0].startsWith('@')) {
               const handle = segs[0].slice(1);
-              creators.push({
-                handle,
-                platform: 'tiktok',
-                profileUrl: `https://www.tiktok.com/@${handle}`,
-                displayName: r.title,
-                bio: r.snippet
-              });
+              creators.push({ handle, platform: 'tiktok', profileUrl: `https://www.tiktok.com/@${handle}`, displayName: '', bio: '' });
             }
           }
         } catch {}
+      };
+
+      for (const r of org) {
+        const link: string = r.link || '';
+        try {
+          consider(link);
+          // Also consider sitelinks
+          const sl = (r.sitelinks && (r.sitelinks.inline || r.sitelinks.list)) || [];
+          for (const s of sl) consider(s.link || s.url);
+        } catch {}
         if (creators.length >= limit) break;
       }
+      logger.info(`SerpAPI ${platform} results for "${query}": ${creators.length}`);
       return creators;
     } catch (e) {
       logger.warn('SerpAPI creator fallback failed', e);
