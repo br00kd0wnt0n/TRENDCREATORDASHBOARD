@@ -217,8 +217,22 @@ app.get('/api/trends/narrative', async (_req, res) => {
     });
 
     // Get top trends with platform diversity (5 from each major platform)
-    // If no recent trends, fallback to all-time trends
-    const lookbackDays = recentTrends > 0 ? 1 : 7; // 24h or 7 days fallback
+    // If no recent trends, fallback to wider timeframes: 7d, 30d, or all-time
+    let lookbackDays = 1; // Start with 24h
+    if (recentTrends === 0) {
+      // Try progressively longer lookbacks
+      const sevenDayCount = await Trend.count({
+        where: { scrapedAt: { [Op.gte]: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }
+      });
+      if (sevenDayCount > 0) {
+        lookbackDays = 7;
+      } else {
+        const thirtyDayCount = await Trend.count({
+          where: { scrapedAt: { [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
+        });
+        lookbackDays = thirtyDayCount > 0 ? 30 : 365; // 30 days or all-time
+      }
+    }
     const lookbackTime = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
 
     logger.info(`📊 Using ${lookbackDays}-day lookback for trends`);
