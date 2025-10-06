@@ -874,10 +874,22 @@
         </div>
 
         <div class="stats-grid" id="statsGrid">
-            <div class="stat-card">
+            <div class="stat-card tooltip">
                 <div class="stat-icon"><i class="fas fa-hashtag"></i></div>
                 <div class="stat-number" id="totalTrends">-</div>
                 <div class="stat-label">Total Trends</div>
+                <span class="tooltiptext" id="totalTrendsTooltip">
+                    <strong>Total Trends Tracked</strong><br><br>
+                    <strong>Platform Breakdown:</strong><br>
+                    • TikTok: <span id="tooltipTikTok">-</span><br>
+                    • X (Twitter): <span id="tooltipTwitter">-</span><br>
+                    • Instagram: <span id="tooltipInstagram">-</span><br>
+                    • Pinterest: <span id="tooltipPinterest">-</span><br><br>
+                    <strong>Sentiment Distribution:</strong><br>
+                    • Positive: <span id="tooltipPositive">-</span><br>
+                    • Neutral: <span id="tooltipNeutral">-</span><br>
+                    • Negative: <span id="tooltipNegative">-</span>
+                </span>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-clock"></i></div>
@@ -1293,14 +1305,37 @@
             try {
                 const response = await fetch('/api/trends/stats');
                 const data = await response.json();
-                
+
                 if (data.success) {
                     document.getElementById('totalTrends').textContent = data.data.totalTrends.toLocaleString();
                     document.getElementById('recentTrends').textContent = data.data.recentTrends.toLocaleString();
-                    
+
                     const highConfidence = data.data.totalTrends * 0.3;
                     document.getElementById('hotTrends').textContent = Math.round(highConfidence).toLocaleString();
                     document.getElementById('aiInsights').textContent = data.data.totalTrends.toLocaleString();
+
+                    // Update tooltip with platform breakdown
+                    const platformStats = data.data.platformStats || [];
+                    const platformMap = {};
+                    platformStats.forEach(p => {
+                        platformMap[p.platform] = parseInt(p.count);
+                    });
+
+                    document.getElementById('tooltipTikTok').textContent = (platformMap['TikTok'] || 0).toLocaleString();
+                    document.getElementById('tooltipTwitter').textContent = (platformMap['X (Twitter)'] || 0).toLocaleString();
+                    document.getElementById('tooltipInstagram').textContent = (platformMap['Instagram'] || 0).toLocaleString();
+                    document.getElementById('tooltipPinterest').textContent = (platformMap['Pinterest'] || 0).toLocaleString();
+
+                    // Update tooltip with sentiment breakdown
+                    const sentimentStats = data.data.sentimentStats || [];
+                    const sentimentMap = {};
+                    sentimentStats.forEach(s => {
+                        sentimentMap[s.sentiment] = parseInt(s.count);
+                    });
+
+                    document.getElementById('tooltipPositive').textContent = (sentimentMap['positive'] || 0).toLocaleString();
+                    document.getElementById('tooltipNeutral').textContent = (sentimentMap['neutral'] || 0).toLocaleString();
+                    document.getElementById('tooltipNegative').textContent = (sentimentMap['negative'] || 0).toLocaleString();
 
                     updateCharts(data.data);
                 }
