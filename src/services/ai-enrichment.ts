@@ -1,4 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { TrendData, AIAnalysis } from '../types';
 import { logger } from '../config/database';
 import dotenv from 'dotenv';
@@ -6,13 +7,61 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export class AIEnrichmentService {
-  private anthropic: Anthropic;
-  private model = 'claude-3-5-sonnet-20240620';
+  private anthropic?: Anthropic;
+  private openai?: OpenAI;
+  private provider: 'anthropic' | 'openai';
+  private anthropicModel = 'claude-3-5-sonnet-20240620';
+  private openaiModel = 'gpt-4o';
 
   constructor() {
-    this.anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY || ''
-    });
+    // Determine which AI provider to use
+    this.provider = (process.env.AI_PROVIDER || 'anthropic') as 'anthropic' | 'openai';
+
+    if (this.provider === 'openai') {
+      if (!process.env.OPENAI_API_KEY) {
+        logger.error('OPENAI_API_KEY not set, falling back to Anthropic');
+        this.provider = 'anthropic';
+      } else {
+        this.openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY
+        });
+        logger.info('🤖 AI Service initialized with OpenAI (gpt-4o)');
+      }
+    }
+
+    if (this.provider === 'anthropic') {
+      this.anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY || ''
+      });
+      logger.info('🤖 AI Service initialized with Anthropic (Claude 3.5 Sonnet)');
+    }
+  }
+
+  private async callAI(prompt: string, maxTokens: number = 2000, temperature: number = 0.7): Promise<string | null> {
+    try {
+      if (this.provider === 'openai' && this.openai) {
+        const response = await this.openai.chat.completions.create({
+          model: this.openaiModel,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: maxTokens,
+          temperature
+        });
+        return response.choices[0]?.message?.content || null;
+      } else if (this.provider === 'anthropic' && this.anthropic) {
+        const response = await this.anthropic.messages.create({
+          model: this.anthropicModel,
+          max_tokens: maxTokens,
+          temperature,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        const content = response.content[0];
+        return content.type === 'text' ? content.text : null;
+      }
+      return null;
+    } catch (error) {
+      logger.error(`AI call failed (${this.provider}):`, error);
+      return null;
+    }
   }
 
   async analyzeTrends(trends: TrendData[]): Promise<Map<string, AIAnalysis>> {
@@ -20,22 +69,15 @@ export class AIEnrichmentService {
 
     try {
       const prompt = this.buildAnalysisPrompt(trends);
-      const response = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 2000,
-        temperature: 0.7,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      });
+      const responseText = await this.callAI(prompt, 2000, 0.7);
 
-      const content = response.content[0];
-      if (content.type === 'text') {
-        const parsedAnalyses = this.parseAIResponse(content.text, trends);
+      if (responseText) {
+        const parsedAnalyses = this.parseAIResponse(responseText, trends);
         parsedAnalyses.forEach((analysis, trendKey) => {
           analyses.set(trendKey, analysis);
         });
+      } else {
+        throw new Error('AI returned null response');
       }
     } catch (error) {
       logger.error('AI analysis failed:', error);
@@ -129,14 +171,8 @@ Return a JSON object with trend identifiers as keys and analysis objects as valu
 
   async generateTrendReport(trends: any[]): Promise<string> {
     try {
-      const response = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 1500,
-        temperature: 0.8,
-        messages: [{
-          role: 'user',
-          content: `Generate an executive summary report for these trending topics:
-          
+      const prompt = `Generate an executive summary report for these trending topics:
+
 ${JSON.stringify(trends.slice(0, 10), null, 2)}
 
 Create a compelling narrative that includes:
@@ -145,12 +181,10 @@ Create a compelling narrative that includes:
 3. Strategic recommendations
 4. Risk factors and considerations
 
-Format as a professional report with sections and bullet points.`
-        }]
-      });
+Format as a professional report with sections and bullet points.`;
 
-      const content = response.content[0];
-      return content.type === 'text' ? content.text : 'Report generation failed';
+      const responseText = await this.callAI(prompt, 1500, 0.8);
+      return responseText || 'Report generation failed';
     } catch (error) {
       logger.error('Report generation failed:', error);
       return 'Unable to generate trend report at this time';
@@ -162,13 +196,21 @@ Format as a professional report with sections and bullet points.`
    */
   async generateDashboardNarrative(stats: any): Promise<any> {
     try {
-      const response = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 1200,
-        temperature: 0.6,
-        messages: [{
-          role: 'user',
-          content: `As a digital culture and trend intelligence expert, analyze these trending hashtags and provide insights about what they reveal, tuned for Amazon Prime Video India's "In Our Prime" Instagram handle (creator-led, fan-made, not traditional marketing; Gen Z/Millennial audience):
+      // Check if we have actual trend data to analyze
+      const hasTrendData = stats && (
+        (stats.topTrends && stats.topTrends.length > 0) ||
+        (stats.trendingContent && stats.trendingContent.length > 0) ||
+        (stats.totalTrends && stats.totalTrends > 0)
+      );
+
+      if (!hasTrendData) {
+        logger.warn('No trend data available for narrative generation');
+        return this.getDefaultNarrative();
+      }
+
+      logger.info(`Generating narrative for ${stats.totalTrends || 0} trends`);
+
+      const prompt = `As a digital culture and trend intelligence expert, analyze these trending hashtags and provide insights about what they reveal, tuned for Amazon Prime Video India's "In Our Prime" Instagram handle (creator-led, fan-made, not traditional marketing; Gen Z/Millennial audience):
 
 ${JSON.stringify(stats, null, 2)}
 
@@ -177,22 +219,27 @@ Focus primarily on the ACTUAL HASHTAGS and trending content, not on data collect
 Generate a JSON response with:
 1. "overview": A 2-3 sentence analysis of what the current trending hashtags reveal about digital culture, consumer behavior, or emerging movements
 2. "totalTrendsInsight": What the variety and volume of these specific hashtags suggests about current cultural/market dynamics (1-2 sentences)
-3. "recentActivityInsight": Analysis of what these particular trends indicate about what's capturing attention right now (1-2 sentences) 
+3. "recentActivityInsight": Analysis of what these particular trends indicate about what's capturing attention right now (1-2 sentences)
 4. "highConfidenceExplanation": Explanation of what makes certain trends more reliable indicators than others, based on their content and platform presence (2 sentences)
 5. "keyInsights": Array of exactly 5 bullet points about what these SPECIFIC hashtags and trends reveal about opportunities, cultural shifts, consumer interests, or market movements
 6. "question": One thought-provoking question about the trend data that would help users explore deeper insights or implications
 
-Analyze the hashtag content itself - what topics, themes, emotions, or interests do they represent? What do they tell us about what people care about right now?`
-        }]
-      });
+Analyze the hashtag content itself - what topics, themes, emotions, or interests do they represent? What do they tell us about what people care about right now?`;
 
-      const content = response.content[0];
-      if (content.type === 'text') {
-        const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+      const responseText = await this.callAI(prompt, 1200, 0.6);
+
+      if (responseText) {
+        logger.info('AI response received, parsing JSON');
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
+          const parsed = JSON.parse(jsonMatch[0]);
+          logger.info('Successfully parsed AI narrative');
+          return parsed;
+        } else {
+          logger.warn('No JSON found in AI response:', responseText.substring(0, 200));
         }
       }
+      logger.warn('Falling back to default narrative');
       return this.getDefaultNarrative();
     } catch (error) {
       logger.error('Dashboard narrative generation failed:', error);
@@ -205,18 +252,7 @@ Analyze the hashtag content itself - what topics, themes, emotions, or interests
    */
   async analyzeContent(prompt: string): Promise<string | null> {
     try {
-      const response = await this.anthropic.messages.create({
-        model: this.model,
-        max_tokens: 1000,
-        temperature: 0.5,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      });
-
-      const content = response.content[0];
-      return content.type === 'text' ? content.text : null;
+      return await this.callAI(prompt, 1000, 0.5);
     } catch (error) {
       logger.error('AI content analysis failed:', error);
       return null;

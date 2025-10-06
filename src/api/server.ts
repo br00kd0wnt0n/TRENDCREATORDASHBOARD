@@ -188,6 +188,8 @@ app.get('/api/trends/narrative', async (_req, res) => {
       }
     });
 
+    logger.info(`📊 Narrative endpoint: totalTrends=${totalTrends}, recentTrends=${recentTrends}`);
+
     const highConfidenceTrends = await Trend.count({
       where: {
         confidence: {
@@ -215,10 +217,17 @@ app.get('/api/trends/narrative', async (_req, res) => {
     });
 
     // Get top trends with platform diversity (5 from each major platform)
+    // If no recent trends, fallback to all-time trends
+    const lookbackDays = recentTrends > 0 ? 1 : 7; // 24h or 7 days fallback
+    const lookbackTime = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+
+    logger.info(`📊 Using ${lookbackDays}-day lookback for trends`);
+
     const tiktokTrends = await Trend.findAll({
       where: {
         platform: 'TikTok',
-        confidence: { [Op.gte]: 0.1 }
+        confidence: { [Op.gte]: 0.1 },
+        scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
       limit: 5,
@@ -228,7 +237,8 @@ app.get('/api/trends/narrative', async (_req, res) => {
     const twitterTrends = await Trend.findAll({
       where: {
         platform: 'X (Twitter)',
-        confidence: { [Op.gte]: 0.1 }
+        confidence: { [Op.gte]: 0.1 },
+        scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
       limit: 5,
@@ -240,11 +250,13 @@ app.get('/api/trends/narrative', async (_req, res) => {
       .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
       .slice(0, 10);
 
+    logger.info(`📊 Found ${topTrends.length} top trends (TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
+
     // Get all recent trends to analyze content patterns
     const allRecentTrends = await Trend.findAll({
       where: {
         scrapedAt: {
-          [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          [Op.gte]: lookbackTime
         }
       },
       order: [['scrapedAt', 'DESC']],
@@ -252,9 +264,11 @@ app.get('/api/trends/narrative', async (_req, res) => {
       raw: true
     });
 
+    logger.info(`📊 Found ${allRecentTrends.length} recent trends for analysis`);
+
     const statsForAI = {
       totalTrends,
-      recentTrends,
+      recentTrends: allRecentTrends.length, // Use actual count for AI
       highConfidenceTrends,
       platformStats,
       sentimentStats,
@@ -274,8 +288,10 @@ app.get('/api/trends/narrative', async (_req, res) => {
     };
 
     // Generate AI narrative
+    logger.info('🤖 Calling AI service to generate narrative...');
     const narrative = await aiService.generateDashboardNarrative(statsForAI);
-    
+    logger.info('✅ AI narrative generated successfully');
+
     // Include top 10 trends for display
     const responseData = {
       ...narrative,
@@ -287,16 +303,16 @@ app.get('/api/trends/narrative', async (_req, res) => {
         sentiment: t.sentiment || 'neutral'
       }))
     };
-    
+
     res.json({
       success: true,
       data: responseData
     });
   } catch (error) {
     logger.error('Failed to generate dashboard narrative:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to generate narrative' 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate narrative'
     });
   }
 });

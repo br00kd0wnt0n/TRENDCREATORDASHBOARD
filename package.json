@@ -33,6 +33,7 @@
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "node-cron": "^3.0.3",
+    "openai": "^6.2.0",
     "pg": "^8.11.5",
     "pg-hstore": "^2.3.4",
     "puppeteer": "^22.12.0",
