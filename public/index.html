@@ -217,6 +217,69 @@
             padding: 24px;
         }
 
+        /* Controls Bar */
+        .crossover-controls {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            background: rgba(255,255,255,0.9);
+            position: sticky;
+            top: 82px; /* below header height */
+            z-index: 9;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .control-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+        }
+
+        .control-btn:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+
+        .control-forms { display: grid; gap: 8px; }
+
+        .control-form { display: none; }
+        .control-form.open { display: block; }
+
+        .control-form label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 6px;
+        }
+
+        .input-row { display: flex; gap: 8px; }
+        .input-row input {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.12);
+            outline: none;
+        }
+        .input-row input:focus { border-color: #31BDBF; box-shadow: 0 0 0 3px rgba(49,189,191,0.15); }
+        .run-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(45deg, #31BDBF, #EB008B);
+            color: #fff;
+            cursor: pointer;
+        }
+
         .insight-card {
             background: white;
             border-radius: 12px;
@@ -529,6 +592,33 @@
                 <i class="fas fa-times"></i>
             </button>
         </div>
+        <div class="crossover-controls" id="crossoverControls">
+            <div class="control-buttons">
+                <button class="control-btn" id="openTrendInputBtn" title="Analyze a specific trend">
+                    <i class="fas fa-hashtag"></i> Trend Input
+                </button>
+                <button class="control-btn" id="openCreatorInputBtn" title="Analyze a specific creator">
+                    <i class="fas fa-user"></i> Creator Input
+                </button>
+            </div>
+            <div class="control-forms">
+                <div class="control-form" id="trendForm" aria-hidden="true">
+                    <label for="trendManualInput">Enter a trend (hashtag, keyword, or topic)</label>
+                    <div class="input-row">
+                        <input type="text" id="trendManualInput" placeholder="#AI, summer fashion, etc." />
+                        <button id="trendAnalyzeBtn" class="run-btn"><i class="fas fa-play"></i></button>
+                    </div>
+                </div>
+                <div class="control-form" id="creatorForm" aria-hidden="true">
+                    <label for="creatorManualInput">Enter a creator name</label>
+                    <div class="input-row">
+                        <input type="text" id="creatorManualInput" placeholder="e.g., Jane Doe" list="creatorNamesList" />
+                        <datalist id="creatorNamesList"></datalist>
+                        <button id="creatorAnalyzeBtn" class="run-btn"><i class="fas fa-play"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <div class="crossover-content" id="crossoverContent">
             <div class="loading">
                 <div class="spinner"></div>
@@ -550,6 +640,15 @@
         const crossoverToggle = document.getElementById('crossoverToggle');
         const crossoverPanel = document.getElementById('crossoverPanel');
         const crossoverContent = document.getElementById('crossoverContent');
+        const crossoverControls = document.getElementById('crossoverControls');
+        const openTrendInputBtn = document.getElementById('openTrendInputBtn');
+        const openCreatorInputBtn = document.getElementById('openCreatorInputBtn');
+        const trendForm = document.getElementById('trendForm');
+        const creatorForm = document.getElementById('creatorForm');
+        const trendManualInput = document.getElementById('trendManualInput');
+        const creatorManualInput = document.getElementById('creatorManualInput');
+        const trendAnalyzeBtn = document.getElementById('trendAnalyzeBtn');
+        const creatorAnalyzeBtn = document.getElementById('creatorAnalyzeBtn');
         const closePanel = document.getElementById('closePanel');
         const trendsFrame = document.getElementById('trends-frame');
         const creatorsFrame = document.getElementById('creators-frame');
@@ -597,6 +696,12 @@
 
             // Trigger crossover insights for the new tab
             generateCrossoverInsights();
+
+            // Hide manual input forms on tab switch; user can open via buttons
+            trendForm.classList.remove('open');
+            trendForm.setAttribute('aria-hidden', 'true');
+            creatorForm.classList.remove('open');
+            creatorForm.setAttribute('aria-hidden', 'true');
         }
 
         // Update analyze button icon and tooltip based on current tab
@@ -1410,59 +1515,17 @@
             console.log('Auto-detect: Analyze Current Selection clicked for tab:', currentTab);
 
             if (currentTab === 'trends') {
-                await analyzeManualTrend();
+                // Open inline trend input instead of browser prompt
+                openTrendInputUI();
             } else if (currentTab === 'creators') {
+                // Open inline creator input (will still auto-detect if possible)
+                openCreatorInputUI();
                 await analyzeCurrentCreator();
             }
         }
 
         // Manual trend input and analysis
-        async function analyzeManualTrend() {
-            console.log('Manual trend analysis triggered');
-
-            // Prompt user for trend input
-            const trendInput = prompt('Enter a trend to analyze (hashtag, keyword, or topic):');
-
-            if (!trendInput || trendInput.trim() === '') {
-                console.log('No trend input provided');
-                return;
-            }
-
-            const trendToAnalyze = trendInput.trim();
-            console.log('Analyzing manual trend:', trendToAnalyze);
-
-            try {
-                // Get all creators for analysis
-                const creatorsData = await fetchCreatorsData();
-                console.log('Available creators for trend analysis:', creatorsData.length);
-
-                if (creatorsData.length === 0) {
-                    alert('No creators available for analysis. Please check the Creator Rolodex connection.');
-                    return;
-                }
-
-                // Create a mock trend object for analysis
-                const mockTrend = {
-                    hashtag: trendToAnalyze.startsWith('#') ? trendToAnalyze : `#${trendToAnalyze}`,
-                    platform: 'manual_input',
-                    content: `Manual trend analysis for: ${trendToAnalyze}`,
-                    engagement_score: 85,
-                    scrapedAt: new Date().toISOString()
-                };
-
-                // Generate insights for this specific trend
-                generateCrossoverInsights({
-                    type: 'trend',
-                    hashtag: mockTrend.hashtag,
-                    specificData: [mockTrend],
-                    manualInput: true
-                });
-
-            } catch (error) {
-                console.error('Manual trend analysis failed:', error);
-                alert('Failed to analyze trend. Please try again.');
-            }
-        }
+        async function analyzeManualTrend() { openTrendInputUI(); }
 
         // Auto-detect current creator from iframe and trigger analysis
         async function analyzeCurrentCreator() {
@@ -1535,18 +1598,11 @@
                     console.log('Cannot access iframe for creator detection');
                 }
 
-                // If no automatic detection, show options
+                // If no automatic detection, open inline creator input instead of prompt
                 if (!detectedCreatorName) {
-                    console.log('Auto-detection failed, showing manual options');
-
-                    // Create a simple selection interface
-                    const creatorNames = creatorsData.map(c => c.full_name || c.name).filter(Boolean);
-                    const selectedName = prompt(
-                        `Could not auto-detect creator name. Please select from:\n\n${creatorNames.slice(0, 10).join('\n')}\n\nEnter the exact name:`
-                    );
-
-                    if (!selectedName) return;
-                    detectedCreatorName = selectedName;
+                    console.log('Auto-detection failed, opening inline creator input');
+                    openCreatorInputUI();
+                    return; // Wait for user to submit via inline control
                 }
 
                 // Find matching creator in database
@@ -1629,3 +1685,114 @@
     </script>
 </body>
 </html>
+        // Controls: open/close helpers
+        function openTrendInputUI(focus = true) {
+            trendForm.classList.add('open');
+            trendForm.setAttribute('aria-hidden', 'false');
+            creatorForm.classList.remove('open');
+            creatorForm.setAttribute('aria-hidden', 'true');
+            if (focus) trendManualInput.focus();
+        }
+
+        function openCreatorInputUI(focus = true) {
+            creatorForm.classList.add('open');
+            creatorForm.setAttribute('aria-hidden', 'false');
+            trendForm.classList.remove('open');
+            trendForm.setAttribute('aria-hidden', 'true');
+            if (focus) creatorManualInput.focus();
+            // Lazy populate suggestions
+            populateCreatorDatalist();
+        }
+
+        async function populateCreatorDatalist() {
+            try {
+                const list = document.getElementById('creatorNamesList');
+                if (list && list.children.length === 0) {
+                    const creators = await fetchCreatorsData();
+                    const names = creators.map(c => c.full_name || c.name).filter(Boolean);
+                    names.slice(0, 200).forEach(n => {
+                        const opt = document.createElement('option');
+                        opt.value = n;
+                        list.appendChild(opt);
+                    });
+                }
+            } catch (e) { console.log('Failed to populate creator list'); }
+        }
+
+        // Bind buttons
+        openTrendInputBtn.addEventListener('click', () => openTrendInputUI());
+        openCreatorInputBtn.addEventListener('click', () => openCreatorInputUI());
+
+        // Run actions from controls
+        trendAnalyzeBtn.addEventListener('click', () => {
+            const value = (trendManualInput.value || '').trim();
+            if (!value) { trendManualInput.focus(); return; }
+            performManualTrendAnalysis(value);
+        });
+        trendManualInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                trendAnalyzeBtn.click();
+            }
+        });
+
+        creatorAnalyzeBtn.addEventListener('click', () => {
+            const value = (creatorManualInput.value || '').trim();
+            if (!value) { creatorManualInput.focus(); return; }
+            performManualCreatorAnalysis(value);
+        });
+        creatorManualInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                creatorAnalyzeBtn.click();
+            }
+        });
+
+        // Programmatic analysis functions
+        async function performManualTrendAnalysis(trendInput) {
+            const trendToAnalyze = trendInput.trim();
+            if (!trendToAnalyze) return;
+            try {
+                const creatorsData = await fetchCreatorsData();
+                if (!creatorsData.length) {
+                    alert('No creators available for analysis. Please check the Creator Rolodex connection.');
+                    return;
+                }
+                const mockTrend = {
+                    hashtag: trendToAnalyze.startsWith('#') ? trendToAnalyze : `#${trendToAnalyze}`,
+                    platform: 'manual_input',
+                    content: `Manual trend analysis for: ${trendToAnalyze}`,
+                    engagement_score: 85,
+                    scrapedAt: new Date().toISOString()
+                };
+                generateCrossoverInsights({ type: 'trend', hashtag: mockTrend.hashtag, specificData: [mockTrend], manualInput: true });
+            } catch (err) {
+                console.error('Manual trend analysis failed:', err);
+                alert('Failed to analyze trend. Please try again.');
+            }
+        }
+
+        async function performManualCreatorAnalysis(creatorNameInput) {
+            const name = creatorNameInput.trim();
+            if (!name) return;
+            try {
+                const creatorsData = await fetchCreatorsData();
+                const matching = creatorsData.find(c => {
+                    const fullName = (c.full_name || c.name || '').toLowerCase();
+                    const q = name.toLowerCase();
+                    return fullName.includes(q) || q.includes(fullName);
+                });
+                if (matching) {
+                    selectedCreator = matching;
+                    if (crossoverPanel.classList.contains('collapsed')) {
+                        crossoverPanel.classList.remove('collapsed');
+                    }
+                    generateCrossoverInsights({ type: 'creator', data: matching, name: matching.full_name || matching.name, isSpecificPage: true });
+                } else {
+                    alert(`Creator "${name}" not found in database. Please try another name.`);
+                }
+            } catch (err) {
+                console.error('Manual creator analysis failed:', err);
+                alert('Failed to analyze creator. Please try again.');
+            }
+        }
