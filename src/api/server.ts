@@ -244,7 +244,7 @@ app.get('/api/trends/narrative', async (_req, res) => {
         scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-      limit: 5,
+      limit: 10, // Get up to 10 from each platform
       raw: true
     });
 
@@ -255,11 +255,12 @@ app.get('/api/trends/narrative', async (_req, res) => {
         scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-      limit: 5,
+      limit: 10, // Get up to 10 from each platform
       raw: true
     });
 
-    // Combine and shuffle for platform diversity
+    // Combine and sort by confidence, ensuring we get top 10 overall
+    // This ensures we get 10 trends even if one platform has fewer results
     const topTrends = [...tiktokTrends, ...twitterTrends]
       .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
       .slice(0, 10);

@@ -1807,7 +1807,7 @@
         }
 
         // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', () => {
+        function initializePage() {
             loadStats();
             loadTrends();
             loadNarrative();
@@ -1824,6 +1824,16 @@
                 }
             });
             observer.observe(document.getElementById('narrativeContent'), { childList: true, subtree: true });
+        }
+
+        document.addEventListener('DOMContentLoaded', initializePage);
+
+        // Handle iframe loading - parent can trigger initialization via postMessage
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'iframe-init' || event.data.type === 'reload-data') {
+                console.log('📡 AI Narrative loaded successfully');
+                initializePage();
+            }
         });
 
         // Removed automatic refresh - now manual scraping only
