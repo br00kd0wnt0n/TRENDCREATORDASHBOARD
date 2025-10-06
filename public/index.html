@@ -585,7 +585,7 @@
                 <h2><i class="fas fa-brain"></i> AI Crossover Insights</h2>
                 <p>Intelligent connections between trends and creators</p>
             </div>
-            <button class="close-button" id="analyzeBtn" onclick="analyzeCurrentSelection()" title="Analyze current selection" style="margin-right: 8px; background: rgba(255, 255, 255, 0.3);">
+            <button class="close-button" id="analyzeBtn" onclick="analyzeCurrentSelection()" title="Analyze current selection" style="margin-right: 8px; background: rgba(255, 255, 255, 0.3); display: none;">
                 <i class="fas fa-search-plus" id="analyzeIcon"></i>
             </button>
             <button class="close-button" id="closePanel" title="Minimize panel">
@@ -595,10 +595,10 @@
         <div class="crossover-controls" id="crossoverControls">
             <div class="control-buttons">
                 <button class="control-btn" id="openTrendInputBtn" title="Analyze a specific trend">
-                    <i class="fas fa-hashtag"></i> Trend Input
+                    <i class="fas fa-hashtag"></i> Trend Lookup
                 </button>
                 <button class="control-btn" id="openCreatorInputBtn" title="Analyze a specific creator">
-                    <i class="fas fa-user"></i> Creator Input
+                    <i class="fas fa-user"></i> Creator Lookup
                 </button>
             </div>
             <div class="control-forms">
@@ -702,6 +702,18 @@
             trendForm.setAttribute('aria-hidden', 'true');
             creatorForm.classList.remove('open');
             creatorForm.setAttribute('aria-hidden', 'true');
+
+            // Show/hide lookup buttons based on current tab
+            const trendLookupBtn = document.getElementById('openTrendInputBtn');
+            const creatorLookupBtn = document.getElementById('openCreatorInputBtn');
+
+            if (currentTab === 'trends') {
+                trendLookupBtn.style.display = 'flex';
+                creatorLookupBtn.style.display = 'none';
+            } else if (currentTab === 'creators') {
+                trendLookupBtn.style.display = 'none';
+                creatorLookupBtn.style.display = 'flex';
+            }
         }
 
         // Update analyze button icon and tooltip based on current tab
@@ -1388,6 +1400,12 @@
 
             // Initialize analyze button for current tab
             updateAnalyzeButton();
+
+            // Initialize lookup buttons visibility (show Trend Lookup on initial load since trends tab is default)
+            const trendLookupBtn = document.getElementById('openTrendInputBtn');
+            const creatorLookupBtn = document.getElementById('openCreatorInputBtn');
+            trendLookupBtn.style.display = 'flex';
+            creatorLookupBtn.style.display = 'none';
 
             // Generate initial insights since panel is open by default
             setTimeout(() => {
