@@ -1446,6 +1446,14 @@
         // Handle iframe load events
         trendsFrame.addEventListener('load', () => {
             console.log('Trends tool loaded');
+
+            // Trigger initialization in the iframe to load Executive Summary
+            try {
+                trendsFrame.contentWindow.postMessage({ type: 'iframe-init' }, '*');
+            } catch (e) {
+                console.log('Could not send init message to trends iframe');
+            }
+
             // Inject selection script if we have permission
             try {
                 const script = document.createElement('script');
