@@ -1545,7 +1545,6 @@
                 let detectedCreatorName = null;
 
                 try {
-                    const creatorsFrame = document.getElementById('creatorsFrame');
                     if (creatorsFrame) {
                         // Method 1: Try to get creator name from iframe title
                         try {
@@ -1680,11 +1679,6 @@
             }
         }
 
-        // Start the dashboard
-        initializeDashboard();
-    </script>
-</body>
-</html>
         // Controls: open/close helpers
         function openTrendInputUI(focus = true) {
             trendForm.classList.add('open');
@@ -1796,3 +1790,9 @@
                 alert('Failed to analyze creator. Please try again.');
             }
         }
+
+        // Start the dashboard
+        initializeDashboard();
+    </script>
+</body>
+</html>
