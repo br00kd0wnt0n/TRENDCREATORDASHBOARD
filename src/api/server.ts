@@ -1176,7 +1176,10 @@ app.get('/api/intel/briefing', async (_req, res) => {
 // Get Strategic Insights and Top 10 trends in crossover-ready format
 app.get('/api/strategic-insights', async (_req, res) => {
   try {
+    logger.info('📊 Strategic insights endpoint called');
     const briefing = await generateIntelBriefing();
+    logger.info(`📊 Briefing generated with ${briefing.topTrends.length} trends`);
+    logger.info(`📊 Narrative overview: ${briefing.narrative?.overview?.substring(0, 100)}...`);
 
     // Format specifically for crossover analysis
     const strategicData = {
@@ -1188,6 +1191,7 @@ app.get('/api/strategic-insights', async (_req, res) => {
       analysisDepth: 'comprehensive'
     };
 
+    logger.info('📊 Sending strategic insights response');
     res.json({
       success: true,
       data: strategicData
@@ -1271,6 +1275,8 @@ app.post('/api/intel/trigger', async (_req, res) => {
 
 // Helper function to generate comprehensive intel briefing
 async function generateIntelBriefing() {
+  logger.info('📊 Starting intel briefing generation');
+
   // Get top trends with platform diversity
   const tiktokTrends = await Trend.findAll({
     where: {
@@ -1278,7 +1284,7 @@ async function generateIntelBriefing() {
       confidence: { [Op.gte]: 0.1 }
     },
     order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-    limit: 5,
+    limit: 10, // Get up to 10 from each platform
     raw: true
   });
 
@@ -1288,14 +1294,17 @@ async function generateIntelBriefing() {
       confidence: { [Op.gte]: 0.1 }
     },
     order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-    limit: 5,
+    limit: 10, // Get up to 10 from each platform
     raw: true
   });
 
-  // Combine for top 10 with diversity
+  // Combine and sort by confidence, ensuring we get top 10 overall
+  // This ensures we get 10 trends even if one platform has fewer results
   const topTrends = [...tiktokTrends, ...twitterTrends]
     .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
     .slice(0, 10);
+
+  logger.info(`📊 Found ${topTrends.length} top trends (TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
 
   // Get comprehensive stats for AI analysis
   const recentTrends = await Trend.findAll({
@@ -1338,7 +1347,9 @@ async function generateIntelBriefing() {
   };
 
   // Generate AI narrative focused on strategic insights
+  logger.info(`📊 Calling AI service with ${statsForAI.topTrends.length} trends, ${statsForAI.recentTrends.length} recent trends`);
   const narrative = await aiService.generateDashboardNarrative(statsForAI);
+  logger.info(`📊 AI narrative generated: ${narrative?.overview?.substring(0, 100)}...`);
 
   return {
     narrative,
