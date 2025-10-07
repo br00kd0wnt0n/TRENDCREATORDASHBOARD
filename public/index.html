@@ -528,6 +528,8 @@
                 <span>Trends</span>
                 <div class="connection-dot" id="creatorsStatus"></div>
                 <span>Creators</span>
+                <div class="connection-dot" id="aiStatus"></div>
+                <span>OpenAI</span>
                 <div class="crossover-status">
                     <div class="status-indicator"></div>
                     <span>AI Crossover Active</span>
@@ -1366,6 +1368,7 @@
         async function checkConnectionStatus() {
             const trendsStatus = document.getElementById('trendsStatus');
             const creatorsStatus = document.getElementById('creatorsStatus');
+            const aiStatus = document.getElementById('aiStatus');
 
             try {
                 await fetch('/api/trends/stats');
@@ -1379,6 +1382,23 @@
                 creatorsStatus.className = 'connection-dot';
             } catch {
                 creatorsStatus.className = 'connection-dot error';
+            }
+
+            // Check OpenAI status via Strategic Insights endpoint
+            try {
+                const response = await fetch('/api/trends/strategic-insights');
+                const data = await response.json();
+
+                // Check if we got real insights (not placeholder)
+                const hasRealInsights = data.success &&
+                    data.data?.strategicInsights?.overview &&
+                    !data.data.strategicInsights.overview.includes('currently processing');
+
+                aiStatus.className = hasRealInsights ? 'connection-dot' : 'connection-dot warning';
+                aiStatus.title = hasRealInsights ? 'OpenAI connected and generating insights' : 'OpenAI responding with placeholder data';
+            } catch (error) {
+                aiStatus.className = 'connection-dot error';
+                aiStatus.title = 'OpenAI connection failed';
             }
         }
 
