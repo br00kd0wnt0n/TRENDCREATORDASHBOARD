@@ -888,6 +888,7 @@
                     // Step 2: Get Strategic Insights from Trend Analysis AI Intel briefing
                     const strategicInsights = await fetchStrategicInsights();
                     console.log('Strategic Insights fetched:', strategicInsights);
+                    console.log('Strategic Insights overview:', strategicInsights?.strategicInsights?.overview);
 
                     if (!strategicInsights || !strategicInsights.topTrends) {
                         updateProgressStep('strategic-insights', 'error', 'Failed to retrieve insights');
@@ -1042,6 +1043,7 @@
 
             // Show Strategic Insights if available (from AI Intel briefing) and NOT manual input
             if (strategicInsights && strategicInsights.strategicInsights && !specificItem?.manualInput) {
+                console.log('Rendering Strategic Insights card with:', strategicInsights.strategicInsights);
                 html += `
                     <div class="insight-card">
                         <h3><i class="fas fa-chart-line"></i> Strategic Insights from Trend Analysis</h3>
