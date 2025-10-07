@@ -244,7 +244,7 @@ app.get('/api/trends/narrative', async (_req, res) => {
         scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-      limit: 10, // Get up to 10 from each platform
+      limit: 4, // Limit per platform for diversity
       raw: true
     });
 
@@ -255,7 +255,7 @@ app.get('/api/trends/narrative', async (_req, res) => {
         scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-      limit: 10, // Get up to 10 from each platform
+      limit: 4, // Limit per platform for diversity
       raw: true
     });
 
@@ -266,17 +266,21 @@ app.get('/api/trends/narrative', async (_req, res) => {
         scrapedAt: { [Op.gte]: lookbackTime }
       },
       order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-      limit: 10, // Get up to 10 from each platform
+      limit: 4, // Limit per platform for diversity
       raw: true
     });
 
-    // Combine all platforms and sort by confidence, ensuring we get top 10 overall
-    // This ensures we get 10 trends even if one platform has fewer results
-    const topTrends = [...instagramTrends, ...tiktokTrends, ...twitterTrends]
-      .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
-      .slice(0, 10);
+    // Interleave platforms for better diversity, then sort by confidence
+    const topTrends: any[] = [];
+    const maxLength = Math.max(instagramTrends.length, tiktokTrends.length, twitterTrends.length);
 
-    logger.info(`📊 Found ${topTrends.length} top trends (Instagram: ${instagramTrends.length}, TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
+    for (let i = 0; i < maxLength && topTrends.length < 10; i++) {
+      if (i < instagramTrends.length) topTrends.push(instagramTrends[i]);
+      if (i < tiktokTrends.length && topTrends.length < 10) topTrends.push(tiktokTrends[i]);
+      if (i < twitterTrends.length && topTrends.length < 10) topTrends.push(twitterTrends[i]);
+    }
+
+    logger.info(`📊 Found ${topTrends.length} top trends with platform diversity (Instagram: ${instagramTrends.length}, TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
 
     // Get all recent trends to analyze content patterns
     const allRecentTrends = await Trend.findAll({
@@ -1295,7 +1299,7 @@ async function generateIntelBriefing() {
       confidence: { [Op.gte]: 0.1 }
     },
     order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-    limit: 10, // Get up to 10 from each platform
+    limit: 4, // Limit per platform for diversity
     raw: true
   });
 
@@ -1305,7 +1309,7 @@ async function generateIntelBriefing() {
       confidence: { [Op.gte]: 0.1 }
     },
     order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-    limit: 10, // Get up to 10 from each platform
+    limit: 4, // Limit per platform for diversity
     raw: true
   });
 
@@ -1315,17 +1319,21 @@ async function generateIntelBriefing() {
       confidence: { [Op.gte]: 0.1 }
     },
     order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
-    limit: 10, // Get up to 10 from each platform
+    limit: 4, // Limit per platform for diversity
     raw: true
   });
 
-  // Combine all platforms and sort by confidence, ensuring we get top 10 overall
-  // This ensures we get 10 trends even if one platform has fewer results
-  const topTrends = [...instagramTrends, ...tiktokTrends, ...twitterTrends]
-    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
-    .slice(0, 10);
+  // Interleave platforms for better diversity
+  const topTrends: any[] = [];
+  const maxLength = Math.max(instagramTrends.length, tiktokTrends.length, twitterTrends.length);
 
-  logger.info(`📊 Found ${topTrends.length} top trends (Instagram: ${instagramTrends.length}, TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
+  for (let i = 0; i < maxLength && topTrends.length < 10; i++) {
+    if (i < instagramTrends.length) topTrends.push(instagramTrends[i]);
+    if (i < tiktokTrends.length && topTrends.length < 10) topTrends.push(tiktokTrends[i]);
+    if (i < twitterTrends.length && topTrends.length < 10) topTrends.push(twitterTrends[i]);
+  }
+
+  logger.info(`📊 Found ${topTrends.length} top trends with platform diversity (Instagram: ${instagramTrends.length}, TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
 
   // Get comprehensive stats for AI analysis
   const recentTrends = await Trend.findAll({
