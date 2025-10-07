@@ -1,4 +1,3 @@
-import { Anthropic } from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { TrendData, AIAnalysis } from '../types';
 import { logger } from '../config/database';
@@ -7,59 +6,32 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export class AIEnrichmentService {
-  private anthropic?: Anthropic;
-  private openai?: OpenAI;
-  private provider: 'anthropic' | 'openai';
-  private anthropicModel = 'claude-3-5-sonnet-20240620';
+  private openai: OpenAI;
   private openaiModel = 'gpt-4o';
 
   constructor() {
-    // Determine which AI provider to use
-    this.provider = (process.env.AI_PROVIDER || 'anthropic') as 'anthropic' | 'openai';
-
-    if (this.provider === 'openai') {
-      if (!process.env.OPENAI_API_KEY) {
-        logger.error('OPENAI_API_KEY not set, falling back to Anthropic');
-        this.provider = 'anthropic';
-      } else {
-        this.openai = new OpenAI({
-          apiKey: process.env.OPENAI_API_KEY
-        });
-        logger.info('🤖 AI Service initialized with OpenAI (gpt-4o)');
-      }
+    if (!process.env.OPENAI_API_KEY) {
+      logger.error('❌ OPENAI_API_KEY not set - AI features will not work');
+      throw new Error('OPENAI_API_KEY environment variable is required');
     }
 
-    if (this.provider === 'anthropic') {
-      this.anthropic = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY || ''
-      });
-      logger.info('🤖 AI Service initialized with Anthropic (Claude 3.5 Sonnet)');
-    }
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+    logger.info('🤖 AI Service initialized with OpenAI (gpt-4o)');
   }
 
   private async callAI(prompt: string, maxTokens: number = 2000, temperature: number = 0.7): Promise<string | null> {
     try {
-      if (this.provider === 'openai' && this.openai) {
-        const response = await this.openai.chat.completions.create({
-          model: this.openaiModel,
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: maxTokens,
-          temperature
-        });
-        return response.choices[0]?.message?.content || null;
-      } else if (this.provider === 'anthropic' && this.anthropic) {
-        const response = await this.anthropic.messages.create({
-          model: this.anthropicModel,
-          max_tokens: maxTokens,
-          temperature,
-          messages: [{ role: 'user', content: prompt }]
-        });
-        const content = response.content[0];
-        return content.type === 'text' ? content.text : null;
-      }
-      return null;
+      const response = await this.openai!.chat.completions.create({
+        model: this.openaiModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: maxTokens,
+        temperature
+      });
+      return response.choices[0]?.message?.content || null;
     } catch (error) {
-      logger.error(`AI call failed (${this.provider}):`, error);
+      logger.error('OpenAI API call failed:', error);
       return null;
     }
   }
