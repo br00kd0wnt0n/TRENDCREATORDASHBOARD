@@ -237,6 +237,17 @@ app.get('/api/trends/narrative', async (_req, res) => {
 
     logger.info(`📊 Using ${lookbackDays}-day lookback for trends`);
 
+    const instagramTrends = await Trend.findAll({
+      where: {
+        platform: 'Instagram',
+        confidence: { [Op.gte]: 0.1 },
+        scrapedAt: { [Op.gte]: lookbackTime }
+      },
+      order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+      limit: 10, // Get up to 10 from each platform
+      raw: true
+    });
+
     const tiktokTrends = await Trend.findAll({
       where: {
         platform: 'TikTok',
@@ -259,13 +270,13 @@ app.get('/api/trends/narrative', async (_req, res) => {
       raw: true
     });
 
-    // Combine and sort by confidence, ensuring we get top 10 overall
+    // Combine all platforms and sort by confidence, ensuring we get top 10 overall
     // This ensures we get 10 trends even if one platform has fewer results
-    const topTrends = [...tiktokTrends, ...twitterTrends]
+    const topTrends = [...instagramTrends, ...tiktokTrends, ...twitterTrends]
       .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
       .slice(0, 10);
 
-    logger.info(`📊 Found ${topTrends.length} top trends (TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
+    logger.info(`📊 Found ${topTrends.length} top trends (Instagram: ${instagramTrends.length}, TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
 
     // Get all recent trends to analyze content patterns
     const allRecentTrends = await Trend.findAll({
@@ -1278,6 +1289,16 @@ async function generateIntelBriefing() {
   logger.info('📊 Starting intel briefing generation');
 
   // Get top trends with platform diversity
+  const instagramTrends = await Trend.findAll({
+    where: {
+      platform: 'Instagram',
+      confidence: { [Op.gte]: 0.1 }
+    },
+    order: [['confidence', 'DESC'], ['scrapedAt', 'DESC']],
+    limit: 10, // Get up to 10 from each platform
+    raw: true
+  });
+
   const tiktokTrends = await Trend.findAll({
     where: {
       platform: 'TikTok',
@@ -1298,13 +1319,13 @@ async function generateIntelBriefing() {
     raw: true
   });
 
-  // Combine and sort by confidence, ensuring we get top 10 overall
+  // Combine all platforms and sort by confidence, ensuring we get top 10 overall
   // This ensures we get 10 trends even if one platform has fewer results
-  const topTrends = [...tiktokTrends, ...twitterTrends]
+  const topTrends = [...instagramTrends, ...tiktokTrends, ...twitterTrends]
     .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
     .slice(0, 10);
 
-  logger.info(`📊 Found ${topTrends.length} top trends (TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
+  logger.info(`📊 Found ${topTrends.length} top trends (Instagram: ${instagramTrends.length}, TikTok: ${tiktokTrends.length}, Twitter: ${twitterTrends.length})`);
 
   // Get comprehensive stats for AI analysis
   const recentTrends = await Trend.findAll({
