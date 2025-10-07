@@ -1448,11 +1448,15 @@
             console.log('Trends tool loaded');
 
             // Trigger initialization in the iframe to load Executive Summary
-            try {
-                trendsFrame.contentWindow.postMessage({ type: 'iframe-init' }, '*');
-            } catch (e) {
-                console.log('Could not send init message to trends iframe');
-            }
+            // Add small delay to ensure iframe JavaScript is fully loaded
+            setTimeout(() => {
+                try {
+                    console.log('Sending iframe-init message to trends frame');
+                    trendsFrame.contentWindow.postMessage({ type: 'iframe-init' }, '*');
+                } catch (e) {
+                    console.log('Could not send init message to trends iframe:', e);
+                }
+            }, 100);
 
             // Inject selection script if we have permission
             try {
