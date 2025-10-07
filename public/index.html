@@ -1826,12 +1826,35 @@
             observer.observe(document.getElementById('narrativeContent'), { childList: true, subtree: true });
         }
 
-        document.addEventListener('DOMContentLoaded', initializePage);
-
         // Handle iframe loading - parent can trigger initialization via postMessage
+        // Set up listener IMMEDIATELY (before DOMContentLoaded) to catch early messages
+        let pageInitialized = false;
         window.addEventListener('message', (event) => {
             if (event.data.type === 'iframe-init' || event.data.type === 'reload-data') {
-                console.log('📡 AI Narrative loaded successfully');
+                console.log('📡 Received iframe-init message from parent');
+                // Only initialize once DOM is ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', () => {
+                        console.log('📡 AI Narrative loaded successfully (via message after DOM ready)');
+                        if (!pageInitialized) {
+                            pageInitialized = true;
+                            initializePage();
+                        }
+                    });
+                } else {
+                    console.log('📡 AI Narrative loaded successfully (via message, DOM already ready)');
+                    if (!pageInitialized) {
+                        pageInitialized = true;
+                        initializePage();
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📡 DOMContentLoaded event fired');
+            if (!pageInitialized) {
+                pageInitialized = true;
                 initializePage();
             }
         });
